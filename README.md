@@ -1,1 +1,1 @@
-Game 'Double' with computer vision 
+ Computer vision for 'Double' game
