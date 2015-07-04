@@ -224,18 +224,8 @@ cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, con
         return img;
     }
 
-    for( size_t i = 0; i < contours.size(); i++ )
-    {
-        const std::vector<cv::Point> & contour = contours[i];
-        for (size_t j=0; j<contour.size()-1; j++)
-        {
-            cv::Point p1 = contour[j];
-            cv::Point p2 = contour[j+1];
-            // draw the circle center
-            cv::line(img, p1, p2, cv::Scalar(0,255,0));
-        }
-    }
-    return ImageCommon::displayMat(img, true, "Circles");
+    cv::drawContours(img, contours, -1, cv::Scalar(0, 255, 0));
+    return ImageCommon::displayMat(img, true, "Contours");
 
 }
 

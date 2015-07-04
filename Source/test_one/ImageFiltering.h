@@ -23,6 +23,8 @@ void simplify(const cv::Mat & src, cv::Mat & dst, double f);
 
 void detectCircles(const cv::Mat & image, std::vector<cv::Vec3f> & output, int minRadius, int maxRadius, double threshold=0.5);
 
+
+
 //******************************************************************************************
 
 }

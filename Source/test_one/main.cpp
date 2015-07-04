@@ -21,8 +21,281 @@ QString PATH = "/Users/vfomin/Documents/Qt_examples/DoubleGameVision/Data";
 
 bool VERBOSE = false;
 
+
+/*!
+ * OK - Find circles and mask their content = Find cards
+ * OK - Rectify circles and its content = Rectify card geometry
+ * - Extract objects from each circle = Extract objects from each card
+ * - Compare objects
+*/
+
+
+QVector<cv::Mat> detectCards(const cv::Mat & graySrc, int cardSizeMin, int cardSizeMax, bool verbose);
+
+
 int main()
 {
+
+
+    // ----- LOAD IMAGES
+
+//    cv::Mat inImage = cv::imread(PATH.toStdString() + "/IMG_20150602_185233.jpg", cv::IMREAD_GRAYSCALE);
+//    cv::Mat inImage = cv::imread(PATH.toStdString() + "/IMG_20150602_185401.jpg", cv::IMREAD_GRAYSCALE);
+//    cv::Mat inImage = cv::imread(PATH.toStdString() + "/IMG_20150602_185420.jpg", cv::IMREAD_GRAYSCALE);
+    cv::Mat inImage = cv::imread(PATH.toStdString() + "/IMG_20150602_185429.jpg", cv::IMREAD_GRAYSCALE);
+
+    ImageCommon::displayMat(inImage, true, "Input image");
+
+
+
+    int cardSizeMin = 100;
+    int cardSizeMax = 400;
+
+    // Resize image
+    cv::Mat procImage = inImage;
+    int dim = qMax(procImage.rows, procImage.cols);
+    int limit = 700;
+    if (dim > limit)
+    {
+        cv::Mat out;
+        double f = limit* 1.0 / dim;
+        cv::resize(procImage, out, cv::Size(), f, f);
+        procImage = out;
+    }
+    // to gray scale and smooth
+    if (procImage.channels() > 1)
+    {
+        cv::Mat out;
+        cv::cvtColor(procImage, out, cv::COLOR_BGR2GRAY);
+        procImage = out;
+    }
+    cv::Mat i0;
+    procImage.copyTo(i0);
+
+
+    // ---- FIND CARDS
+
+
+    QVector<cv::Mat> cards = detectCards(procImage, cardSizeMin, cardSizeMax, VERBOSE);
+    if (cards.isEmpty())
+    {
+        SD_ERR("No cards found");
+        return 0;
+    }
+
+// DEBUG:
+//    for (int count=0; count<cards.size();count++)
+//    {
+//        const cv::Mat & card = cards.at(count);
+//        ImageCommon::displayMat(card, true, QString("Card %1").arg(count+1));
+//    }
+
+    // ---- UNIFY SIZE OF THE CARDS
+    int nbCards = cards.size();
+    int maxDim = qMax(cards[0].cols, cards[0].rows);
+    for (int count=1; count<nbCards;count++)
+    {
+        const cv::Mat & card = cards.at(count);
+        if (maxDim < card.cols)
+        {
+            maxDim = card.cols;
+        }
+        if (maxDim < card.rows)
+        {
+            maxDim = card.rows;
+        }
+    }
+    cv::Size uniSize(maxDim, maxDim);
+
+    SD_TRACE(QString("Max size : %1, %2").arg(uniSize.width).arg(uniSize.height));
+
+    // resize cards :
+    QVector<cv::Mat> uniCards(nbCards);
+    for (int count=0; count<nbCards;count++)
+    {
+        cv::resize(cards[count], uniCards[count],uniSize);
+//        ImageCommon::displayMat(uniCards[count], true, QString("Card %1").arg(count+1));
+    }
+
+    // ---- EXTRACT OBJECT FEATURES FROM EACH CARD
+    cv::Mat card = uniCards[2];
+    ImageCommon::displayMat(card, true, QString("Card"));
+
+    {
+
+    VERBOSE = true;
+    cv::Mat procImage = card;
+
+//    // Equalize histogram
+//    cv::equalizeHist(procImage, procImage);
+//    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Eq.Hist");
+
+    // Derivate
+    cv::Mat t1, t2, t3;
+    cv::Scharr(procImage, t1, CV_32F, 1, 0);
+    cv::Scharr(procImage, t2, CV_32F, 0, 1);
+
+    cv::magnitude(t1, t2, t3);
+    double minVal, maxVal;
+    cv::minMaxLoc(t3, &minVal, &maxVal);
+    double a = 255.0/(maxVal-minVal);
+    double b = -255.0 * minVal/(maxVal-minVal);
+    t3.convertTo(procImage, CV_8U, a, b);
+    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Contours");
+
+    cv::blur(procImage, procImage, cv::Size(3,3));
+    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Blur");
+
+//    cv::Laplacian(procImage, procImage, CV_8U, 3);
+//    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Laplacian");
+
+    // Loop on Threshold values
+//    for (int i=15; i<122; i+= 15)
+//    {
+//        cv::Mat t;
+//        cv::threshold(procImage, t, i, 255, cv::THRESH_BINARY);
+//        if (VERBOSE) ImageCommon::displayMat(t, true, "Threshold");
+//    }
+
+    double t = 20;
+    cv::threshold(procImage, procImage, t, 255, cv::THRESH_BINARY);
+    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Threshold");
+
+    // Morpho
+//    cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
+////    cv::Mat k2 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(7,7));
+//    cv::morphologyEx(procImage, procImage, cv::MORPH_OPEN, k1);
+////    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k2);
+//    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Morpho");
+
+
+    // Find contours
+    std::vector< std::vector<cv::Point> > contours;
+    std::vector< std::vector<cv::Point> > out;
+    cv::findContours(procImage, contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
+    if (VERBOSE) SD_TRACE(QString("Contours count : %1").arg(contours.size()));
+
+//    int minArea = cardSizeMin*cardSizeMin;
+//    if (VERBOSE) SD_TRACE(QString("Min area : %1").arg(minArea));
+//    if (VERBOSE) SD_TRACE(QString("Contours count : %1").arg(contours.size()));
+//    for (size_t i=0;i<contours.size();i++)
+//    {
+//        std::vector<cv::Point> contour = contours[i];
+//        cv::Rect brect = cv::boundingRect(contour);
+//        int a = brect.area();
+//        if (a > minArea && ImageCommon::isCircleLike(contour))
+//        {
+//            out.push_back(contour);
+//        }
+//    }
+
+//    if (VERBOSE) SD_TRACE(QString("Selected contours count : %1").arg(out.size()));
+    if (VERBOSE) ImageCommon::displayContour(contours, procImage);
+
+
+
+    }
+
+
+
+
+    return 0;
+}
+
+QVector<cv::Mat> detectCards(const cv::Mat & graySrc, int cardSizeMin, int cardSizeMax, bool verbose)
+{
+    cv::Mat procImage;
+    graySrc.copyTo(procImage);
+
+    double fs = 0.20;
+    cv::Size size(fs*procImage.cols, fs*procImage.rows);
+    double sigmaX = size.width*0.25;
+    double sigmaY = size.height*0.25;
+    cv::Mat freqMask = ImageFiltering::getGaussianKernel2D(size, sigmaX, sigmaY);
+    ImageFiltering::freqFilter(procImage, procImage, freqMask);
+
+    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Low freq image");
+
+//    double f = 5.0;
+//    ImageFiltering::simplify(procImage, procImage, f);
+//    ImageCommon::displayMat(procImage, true, "Resized");
+
+
+    // Derivate
+    cv::Mat t1, t2, t3;
+    cv::Scharr(procImage, t1, CV_32F, 1, 0);
+    cv::Scharr(procImage, t2, CV_32F, 0, 1);
+    if (VERBOSE) ImageCommon::displayMat(t1, true, "Scharr x");
+    if (VERBOSE) ImageCommon::displayMat(t2, true, "Scharr y");
+
+    cv::magnitude(t1, t2, t3);
+    double minVal, maxVal;
+    cv::minMaxLoc(t3, &minVal, &maxVal);
+    double a = 255.0/(maxVal-minVal);
+    double b = -255.0 * minVal/(maxVal-minVal);
+    t3.convertTo(procImage, CV_8U, a, b);
+    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Contours");
+
+
+    // Threshold
+    double t = 255*0.4;
+    cv::threshold(procImage, procImage, t, 255, cv::THRESH_BINARY);
+    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Threshold");
+
+    // Morpho
+    cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
+//    cv::Mat k2 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(7,7));
+    cv::morphologyEx(procImage, procImage, cv::MORPH_OPEN, k1);
+//    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k2);
+    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Morpho");
+
+
+    // Find contours
+    std::vector< std::vector<cv::Point> > contours;
+    std::vector< std::vector<cv::Point> > out;
+    cv::findContours(procImage, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+    int minArea = cardSizeMin*cardSizeMin;
+    if (VERBOSE) SD_TRACE(QString("Min area : %1").arg(minArea));
+    if (VERBOSE) SD_TRACE(QString("Contours count : %1").arg(contours.size()));
+    for (size_t i=0;i<contours.size();i++)
+    {
+        std::vector<cv::Point> contour = contours[i];
+        cv::Rect brect = cv::boundingRect(contour);
+        int a = brect.area();
+        if (a > minArea && ImageCommon::isCircleLike(contour))
+        {
+            out.push_back(contour);
+        }
+    }
+
+    if (VERBOSE) SD_TRACE(QString("Selected contours count : %1").arg(out.size()));
+    if (VERBOSE) ImageCommon::displayContour(contours, procImage);
+
+
+    QVector<cv::Mat> cards(out.size());
+
+    double marginFactor = 0.03;
+    for (size_t i=0; i<out.size(); i++)
+    {
+        cv::Rect brect = cv::boundingRect(out[i]);
+
+        brect.x += brect.width * marginFactor;
+        brect.y += brect.height * marginFactor;
+        brect.width -= brect.width * marginFactor * 2;
+        brect.height -= brect.height * marginFactor * 2;
+
+        cv::Mat mask = ImageFiltering::getCircleKernel2D(brect.size(), 1, CV_8U);
+        cv::Mat t = graySrc(brect).mul(mask);
+        t.copyTo(cards[i]);
+        if (VERBOSE) ImageCommon::displayMat(cards[i], true, QString("Card %1").arg(i));
+    }
+
+    return cards;
+}
+
+
+
 
 
 
@@ -94,46 +367,6 @@ int main()
     return 0;
 #endif
 
-
-#if 1
-//    cv::Mat inImage = cv::imread(PATH.toStdString() + "/IMG_20150602_185233.jpg", cv::IMREAD_GRAYSCALE);
-//    cv::Mat inImage = cv::imread(PATH.toStdString() + "/IMG_20150602_185401.jpg", cv::IMREAD_GRAYSCALE);
-//    cv::Mat inImage = cv::imread(PATH.toStdString() + "/IMG_20150602_185420.jpg", cv::IMREAD_GRAYSCALE);
-    cv::Mat inImage = cv::imread(PATH.toStdString() + "/IMG_20150602_185429.jpg", cv::IMREAD_GRAYSCALE);
-
-    ImageCommon::displayMat(inImage, true, "Input image");
-
-    // - Find circles and mask their content = Find cards
-    // - Rectify circles and its content = Rectify card geometry
-    // - Extract objects from each circle = Extract objects from each card
-    // - Compare objects
-
-    int cardSizeMin = 100;
-    int cardSizeMax = 400;
-
-    // Resize image
-    cv::Mat procImage = inImage;
-    int dim = qMax(procImage.rows, procImage.cols);
-    int limit = 700;
-    if (dim > limit)
-    {
-        cv::Mat out;
-        double f = limit* 1.0 / dim;
-        cv::resize(procImage, out, cv::Size(), f, f);
-        procImage = out;
-    }
-    // to gray scale and smooth
-    if (procImage.channels() > 1)
-    {
-        cv::Mat out;
-        cv::cvtColor(procImage, out, cv::COLOR_BGR2GRAY);
-        procImage = out;
-    }
-    cv::Mat i0;
-    procImage.copyTo(i0);
-
-#endif
-
 #if 0
     // Sharpen
     cv::Mat t1, t2;
@@ -172,138 +405,6 @@ int main()
 
 #endif
 
-
-#if 1
-
-    double fs = 0.20;
-    cv::Size size(fs*procImage.cols, fs*procImage.rows);
-    double sigmaX = size.width*0.25;
-    double sigmaY = size.height*0.25;
-    cv::Mat freqMask = ImageFiltering::getGaussianKernel2D(size, sigmaX, sigmaY);
-    ImageFiltering::freqFilter(procImage, procImage, freqMask);
-
-    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Low freq image");
-
-//    double f = 5.0;
-//    ImageFiltering::simplify(procImage, procImage, f);
-//    ImageCommon::displayMat(procImage, true, "Resized");
-
-
-    // Derivate
-    cv::Mat t1, t2, t3;
-    cv::Scharr(procImage, t1, CV_32F, 1, 0);
-    cv::Scharr(procImage, t2, CV_32F, 0, 1);
-    if (VERBOSE) ImageCommon::displayMat(t1, true, "Scharr x");
-    if (VERBOSE) ImageCommon::displayMat(t2, true, "Scharr y");
-
-    cv::magnitude(t1, t2, t3);
-    double minVal, maxVal;
-    cv::minMaxLoc(t3, &minVal, &maxVal);
-    double a = 255.0/(maxVal-minVal);
-    double b = -255.0 * minVal/(maxVal-minVal);
-    t3.convertTo(procImage, CV_8U, a, b);
-    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Contours");
-
-
-    // Threshold
-    double t = 255*0.4;
-    cv::threshold(procImage, procImage, t, 255, cv::THRESH_BINARY);
-    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Threshold");
-
-    // Morpho
-    cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
-//    cv::Mat k2 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(7,7));
-    cv::morphologyEx(procImage, procImage, cv::MORPH_OPEN, k1);
-//    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k2);
-    if (VERBOSE) ImageCommon::displayMat(procImage, true, "Morpho");
-
-
-    // Find contours
-    std::vector< std::vector<cv::Point> > contours;
-    std::vector< std::vector<cv::Point> > out;
-    cv::findContours(procImage, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-
-    int minArea = cardSizeMin*cardSizeMin;
-    if (VERBOSE) SD_TRACE(QString("Min area : %1").arg(minArea));
-    if (VERBOSE) SD_TRACE(QString("Contours count : %1").arg(contours.size()));
-    for (size_t i=0;i<contours.size();i++)
-    {
-        std::vector<cv::Point> contour = contours[i];
-        cv::Rect brect = cv::boundingRect(contour);
-        int a = brect.area();
-        if (a > minArea && ImageCommon::isCircleLike(contour))
-        {
-            out.push_back(contour);
-        }
-    }
-
-    if (VERBOSE) SD_TRACE(QString("Selected contours count : %1").arg(out.size()));
-    if (VERBOSE) ImageCommon::displayContour(out, procImage);
-
-
-    QVector<cv::Mat> cards(out.size());
-
-    for (size_t i=0; i<out.size(); i++)
-    {
-        cv::Rect brect = cv::boundingRect(out[i]);
-        cv::Mat mask = ImageFiltering::getCircleKernel2D(brect.size(), 1, CV_8U);
-        cv::Mat t = i0(brect).mul(mask);
-        t.copyTo(cards[i]);
-        ImageCommon::displayMat(cards[i], true, QString("Card %1").arg(i));
-    }
-
-
-//    std::vector<cv::Vec3f> circles;
-//    {
-//        cv::Point2f center;
-//        float r;
-//        for (size_t i=0; i<out.size(); i++)
-//        {
-//            cv::minEnclosingCircle(out[i], center, r);
-//            circles.push_back(cv::Vec3f(center.x, center.y, r));
-//        }
-//    }
-//    SD_TRACE(QString("Circles count : %1").arg(circles.size()));
-//    ImageCommon::displayCircles(circles, procImage);
-
-#endif
-
-
-
-#if 0
-
-    std::vector<cv::Vec3f> circles;
-    ImageFiltering::detectCircles(procImage, circles, cardSizeMin/2, cardSizeMax/2, 0.4);
-
-    // display result :
-    cv::Mat img;
-    procImage.copyTo(img);
-    for( size_t i = 0; i < circles.size(); i++ )
-    {
-        cv::Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
-        int radius = cvRound(circles[i][2]);
-        // draw the circle center
-        cv::circle( img, center, 3, cv::Scalar(0,255,0), -1, 8, 0 );
-        // draw the circle outline
-        cv::circle( img, center, radius, cv::Scalar(0,0,255), 3, 8, 0 );
-    }
-    cv::imshow( "circles", img );
-    cv::waitKey(0);
-
-#endif
-
-
-
-#if 0
-    cv::Mat out;
-    cv::Mat cardTemplate = ImageFiltering::getCircleKernel2D(cardSizeMin, cardSizeMin);
-    cv::matchTemplate(procImage, cardTemplate,out,cv::TM_CCORR_NORMED);
-
-    ImageCommon::displayMat(out, true, "Match template");
-
-#endif
-
-
 #if 0
 
     // Find cards = find circles and mask their content
@@ -333,5 +434,35 @@ int main()
 
 #endif
 
-    return 0;
-}
+
+#if 0
+    cv::Mat out;
+    cv::Mat cardTemplate = ImageFiltering::getCircleKernel2D(cardSizeMin, cardSizeMin);
+    cv::matchTemplate(procImage, cardTemplate,out,cv::TM_CCORR_NORMED);
+
+    ImageCommon::displayMat(out, true, "Match template");
+
+#endif
+
+
+#if 0
+
+    std::vector<cv::Vec3f> circles;
+    ImageFiltering::detectCircles(procImage, circles, cardSizeMin/2, cardSizeMax/2, 0.4);
+
+    // display result :
+    cv::Mat img;
+    procImage.copyTo(img);
+    for( size_t i = 0; i < circles.size(); i++ )
+    {
+        cv::Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+        int radius = cvRound(circles[i][2]);
+        // draw the circle center
+        cv::circle( img, center, 3, cv::Scalar(0,255,0), -1, 8, 0 );
+        // draw the circle outline
+        cv::circle( img, center, radius, cv::Scalar(0,0,255), 3, 8, 0 );
+    }
+    cv::imshow( "circles", img );
+    cv::waitKey(0);
+
+#endif
