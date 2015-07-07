@@ -205,7 +205,7 @@ cv::Mat displayCircles(const std::vector<cv::Vec3f> &circles, const cv::Mat &bac
 
 //******************************************************************************************
 
-cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, const cv::Mat &background)
+cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, const cv::Mat &background, bool oneColor)
 {
     cv::Mat t, img;
     if (background.channels() == 1)
@@ -224,9 +224,51 @@ cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, con
         return img;
     }
 
-    cv::drawContours(img, contours, -1, cv::Scalar(0, 255, 0));
+    if (oneColor)
+    {
+        cv::drawContours(img, contours, -1, cv::Scalar(0, 255, 0));
+    }
+    else
+    {
+        int idx = 0;
+        for( ; idx < contours.size(); idx++)
+        {
+            cv::Scalar color( rand()&255, rand()&255, rand()&255 );
+            cv::drawContours( img, contours, idx, color);
+        }
+    }
     return ImageCommon::displayMat(img, true, "Contours");
 
+}
+
+//******************************************************************************************
+
+cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, const std::vector<cv::Vec4i> &hierarchy, const cv::Mat &background)
+{
+    cv::Mat t, img;
+    if (background.channels() == 1)
+    {
+        background.copyTo(t);
+        cv::Mat m[] = {t, t, t};
+        cv::merge(m, 3, img);
+    }
+    else if (background.channels() == 3)
+    {
+        background.copyTo(img);
+    }
+    else
+    {
+        SD_TRACE("Background image should have 1 or 3 channels");
+        return img;
+    }
+
+    int idx = 0;
+    for( ; idx>=0; idx = hierarchy[idx][0])
+    {
+        cv::Scalar color( rand()&255, rand()&255, rand()&255 );
+        cv::drawContours( img, contours, idx, color, cv::FILLED, cv::LINE_8, hierarchy);
+    }
+    return ImageCommon::displayMat(img, true, "Contours");
 }
 
 //******************************************************************************************
