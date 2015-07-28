@@ -24,9 +24,10 @@ public:
     CardDetector(int minSize, int maxSize, bool verbose=false);
 
     QVector<cv::Mat> detectCards(const cv::Mat & src);
-    cv::Mat uniformSize(const cv::Mat & src, int sizeX, int sizeY=0);
-    QVector<cv::Mat> uniformSize(const QVector<cv::Mat> & src, int sizeX, int sizeY=0);
+    cv::Mat uniformSize(const cv::Mat & card, int sizeX, int sizeY=0);
+    QVector<cv::Mat> uniformSize(const QVector<cv::Mat> & cards, int sizeX, int sizeY=0);
 
+    void extractObjects(const cv::Mat & card, QVector<std::vector<cv::Point> > * objectContours, QVector<cv::Mat> *objectMasks=0);
 
 protected:
 

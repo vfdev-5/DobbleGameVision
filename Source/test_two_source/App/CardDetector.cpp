@@ -1,4 +1,7 @@
 
+// Qt
+#include <qmath.h>
+
 // Opencv
 #include <opencv2/imgproc.hpp>
 
@@ -106,7 +109,7 @@ QVector<cv::Mat> CardDetector::detectCards(const cv::Mat &src)
 
     QVector<cv::Mat> cards(out.size());
 
-    double marginFactor = 0.03;
+    double marginFactor = 0.02;
     for (size_t i=0; i<out.size(); i++)
     {
         cv::Rect brect = cv::boundingRect(out[i]);
@@ -125,7 +128,10 @@ QVector<cv::Mat> CardDetector::detectCards(const cv::Mat &src)
         cv::Mat t, mask2;
         cv::merge(mx, mask2);
         t = src(brect).mul(mask2);
-        t.copyTo(cards[i]);
+        // cut a little the circle boundaries
+        int cut = 1;
+        cv::Rect r(cut,cut,brect.width-2*cut, brect.height-2*cut);
+        t(r).copyTo(cards[i]);
         if (_verbose) ImageCommon::displayMat(cards[i], true, QString("Card %1").arg(i));
     }
 
@@ -147,15 +153,118 @@ cv::Mat CardDetector::uniformSize(const cv::Mat &src, int sizeX, int sizeY)
 
 //******************************************************************************************
 
-QVector<cv::Mat> CardDetector::uniformSize(const QVector<cv::Mat> &src, int sizeX, int sizeY)
+QVector<cv::Mat> CardDetector::uniformSize(const QVector<cv::Mat> &cards, int sizeX, int sizeY)
 {
-    QVector<cv::Mat> out(src.size());
-    for (int count=0; count<src.size(); count++)
+    QVector<cv::Mat> out(cards.size());
+    for (int count=0; count<cards.size(); count++)
     {
-        const cv::Mat & mat = src[count];
+        const cv::Mat & mat = cards[count];
         out[count] = uniformSize(mat, sizeX, sizeY);
     }
     return out;
+}
+
+//******************************************************************************************
+/*!
+ * \brief CardDetector::extractObjects Extracts objects from the card
+ * \param card
+ * \return
+ */
+void CardDetector::extractObjects(const cv::Mat &card, QVector<std::vector<cv::Point> > * objectContours, QVector<cv::Mat> * objectMasks)
+{
+    if (!objectContours)
+    {
+        SD_TRACE("CardDetector::extractObjects : ObjectContours is null");
+        return;
+    }
+
+    cv::Size uniSize = card.size();
+    cv::Mat procImage;
+    card.copyTo(procImage);
+    if (procImage.channels() > 1)
+    {
+        cv::cvtColor(procImage, procImage, cv::COLOR_BGR2GRAY);
+    }
+
+    // Median filter
+    cv::medianBlur(procImage, procImage, 5);
+    if (_verbose) ImageCommon::displayMat(procImage, true, "Median");
+
+//    // Enhance contours :
+//    ImageFiltering::enhance(procImage, procImage);
+//    if (_verbose) ImageCommon::displayMat(procImage, true, "Enhance");
+
+    // Canny
+    cv::Canny(procImage, procImage, 20, 150);
+    if (_verbose) ImageCommon::displayMat(procImage, true, "Canny");
+
+    // Morpho
+    cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
+    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), 2);
+    if (_verbose) ImageCommon::displayMat(procImage, true, "Morpho");
+
+    // Find contours
+    std::vector< std::vector<cv::Point> > contours;
+    cv::findContours(procImage, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+    objectContours->clear();
+    objectContours->resize(contours.size());
+
+
+    int maxArea = 0.25 * M_PI * uniSize.width * uniSize.height;
+    int minArea = 16;
+    //    int minArea = 0.25 * M_PI * objMinSize*objMinSize;
+    int roiRadius = 0.45 * uniSize.width;
+    if (_verbose) SD_TRACE(QString("Roi radius : %1").arg(roiRadius));
+    //    int maxLength = 0.95*uniSize.width * M_PI;
+    if (_verbose) SD_TRACE(QString("Contours count : %1").arg(contours.size()));
+
+    int count=0;
+    for (size_t i=0;i<contours.size();i++)
+    {
+        std::vector<cv::Point> contour = contours[i];
+        //        double p = cv::arcLength(contour, true);
+        //        if (p < maxLength)
+        //        {
+        //            double a = cv::contourArea(contour, true);
+        cv::Rect brect = cv::boundingRect(contour);
+        //                SD_TRACE4("Contour brect: %1, %2, %3, %4", brect.x, brect.y, brect.br().x, brect.br().y);
+        int a = brect.area();
+        int dx = brect.tl().x + brect.width/2 - uniSize.width/2;
+        int dy = brect.tl().y + brect.height/2 - uniSize.height/2;
+        int maxdim = qMax(brect.width, brect.height);
+        // Select contour such that :
+        // a) bounding rect of the contour larger min area and smaller 1/4 of card size
+        // b) distance between center of the contour and the card center is smaller than card radius
+        // c) max dimension of contour is smaller than card radius
+        // d) contour brect should not touch (+/- 1 pixel) image boundaries
+        if (a > minArea && a < maxArea &&
+                dx*dx + dy*dy < roiRadius*roiRadius &&
+                maxdim < roiRadius &&
+                brect.x > 1 && brect.y > 1 &&
+                brect.br().x < uniSize.width-2 &&  brect.br().y < uniSize.height)
+        {
+            (*objectContours)[count].swap(contour);
+            count++;
+        }
+        //        }
+    }
+    objectContours->resize(count);
+
+    if (_verbose) SD_TRACE(QString("Selected contours count : %1").arg(count));
+    if (_verbose) ImageCommon::displayContour(objectContours->toStdVector(), card, false, true);
+
+    // Draw filled contours as segmented image:
+    if (objectMasks) {
+        objectMasks->clear();
+        objectMasks->resize(count);
+        std::vector<std::vector<cv::Point> > out = objectContours->toStdVector();
+        for(int idx=0; idx < count; idx++)
+        {
+            (*objectMasks)[idx] = cv::Mat(procImage.rows, procImage.cols, CV_8U, cv::Scalar::all(0));
+            cv::Scalar color( 255 );
+            cv::drawContours( (*objectMasks)[idx], out, idx, color, 1);
+        }
+    }
 }
 
 //******************************************************************************************

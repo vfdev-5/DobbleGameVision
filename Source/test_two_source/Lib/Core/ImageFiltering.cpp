@@ -243,5 +243,25 @@ void simplify(const cv::Mat &src, cv::Mat &dst, double f)
 }
 
 //******************************************************************************************
+/*!
+ * \brief enhance image contrast using cv::Scharr derivative
+ * \param input
+ * \param output
+ */
+void enhance(const cv::Mat &input, cv::Mat &output, double strength)
+{
+    cv::Mat t1, t2, t3;
+    cv::Sobel(input, t1, CV_32F, 1, 0);
+    cv::Sobel(input, t2, CV_32F, 0, 1);
+    cv::Laplacian(input, t3, CV_32F, 3);
+//    ImageCommon::displayMat(t3, true, "Laplacian");
+    cv::magnitude(t1, t2, t1);
+//    ImageCommon::displayMat(t1, true, "Sobel");
+    input.convertTo(t2, CV_32F);
+    t2 -= strength*(t1 + t3);
+    t2.convertTo(output, CV_8U);
+}
+
+//******************************************************************************************
 
 }

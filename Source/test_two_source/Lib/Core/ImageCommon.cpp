@@ -32,7 +32,8 @@ cv::Mat displayMat(const cv::Mat & inputImage0, bool showMinMax, const QString &
     int depth = inputImage0.elemSize1();
 
     cv::Mat inputImage;
-    if (inputImage0.depth() != CV_32F && inputImage0.depth() != CV_64F)
+    int inputDepth = inputImage0.depth();
+    if (inputDepth != CV_32F && inputDepth != CV_64F)
     {
         inputImage0.convertTo(inputImage, CV_32F);
     }
@@ -102,31 +103,40 @@ cv::Mat displayMat(const cv::Mat & inputImage0, bool showMinMax, const QString &
     minMaxComputed.resize(nbBands, false);
     for (int i=0; i < mapping.size(); i ++)
     {
-       int index = mapping.value(i+1) - 1;
-       if (!minMaxComputed[index])
-       {
-           cv::minMaxLoc(iChannels[index], &min[index], &max[index]);
-           cv::Scalar mean, std;
-           cv::meanStdDev(iChannels[index], mean, std);
-           nmin[index] = mean.val[0] - 3.0*std.val[0];
-           nmin[index] = (nmin[index] < min[index]) ? min[index] : nmin[index];
-           nmax[index] = mean.val[0] + 3.0*std.val[0];
-           nmax[index] = (nmax[index] > max[index]) ? max[index] : nmax[index];
-       }
-       if (showMinMax)
-       {
-           SD_TRACE( QString( "Image " + windowNameS + ", min/max : %1, %2" ).arg( min[index] ).arg( max[index] ) );
-           SD_TRACE( QString( "Image " + windowNameS + ", min/max using mean/std : %1, %2").arg( nmin[index] ).arg(  nmax[index] ) );
-       }
-       double a(1.0);
-       double b(0.0);
+        int index = mapping.value(i+1) - 1;
+        if (inputDepth != CV_8U)
+        {
+            if (!minMaxComputed[index])
+            {
+                cv::minMaxLoc(iChannels[index], &min[index], &max[index]);
+                cv::Scalar mean, std;
+                cv::meanStdDev(iChannels[index], mean, std);
+                nmin[index] = mean.val[0] - 3.0*std.val[0];
+                nmin[index] = (nmin[index] < min[index]) ? min[index] : nmin[index];
+                nmax[index] = mean.val[0] + 3.0*std.val[0];
+                nmax[index] = (nmax[index] > max[index]) ? max[index] : nmax[index];
+            }
+        }
+        else
+        {
+            nmin[index] = min[index] = 0;
+            nmax[index] = max[index] = 255;
+        }
 
-       if (nmin[index] < nmax[index])
-       {
-           a = 255.0 / ( nmax[index] - nmin[index] );
-           b = - 255.0 * nmin[index] / ( nmax[index] - nmin[index] );
-       }
-       iChannels[index].convertTo(oChannels[i], CV_8U, a, b);
+        if (showMinMax)
+        {
+            SD_TRACE( QString( "Image " + windowNameS + ", min/max : %1, %2" ).arg( min[index] ).arg( max[index] ) );
+            SD_TRACE( QString( "Image " + windowNameS + ", min/max using mean/std : %1, %2").arg( nmin[index] ).arg(  nmax[index] ) );
+        }
+        double a(1.0);
+        double b(0.0);
+
+        if (nmin[index] < nmax[index])
+        {
+            a = 255.0 / ( nmax[index] - nmin[index] );
+            b = - 255.0 * nmin[index] / ( nmax[index] - nmin[index] );
+        }
+        iChannels[index].convertTo(oChannels[i], CV_8U, a, b);
     }
 
     cv::merge(oChannels, outputImage8U);

@@ -7,7 +7,6 @@
 #include <QString>
 #include <QDir>
 #include <QFile>
-#include <qmath.h>
 
 // Opencv
 #include <opencv2/core.hpp>
@@ -31,8 +30,6 @@ bool VERBOSE = false;
  *
  * - Compare objects
 */
-
-QVector<cv::Mat> detectCards(const cv::Mat & src, int cardSizeMin, int cardSizeMax, bool verbose);
 
 bool less(const std::vector<cv::Point> & c1, const std::vector<cv::Point> & c2)
 {
@@ -77,7 +74,7 @@ int main(int argc, char** argv)
 #if 0
     QStringList filesToOpen = files;
 #else
-    QStringList filesToOpen = QStringList() << files[0];
+    QStringList filesToOpen = QStringList() << files[3];
 #endif
 
     int cardSizeMin = 100;
@@ -124,7 +121,6 @@ int main(int argc, char** argv)
         //    }
 
         // ---- UNIFY SIZE OF THE CARDS
-        int nbCards = cards.size();
         int uniDim = (cardSizeMin + cardSizeMax)/2;
         //    int maxDim = qMax(cards[0].cols, cards[0].rows);
         //    for (int count=1; count<nbCards;count++)
@@ -141,109 +137,26 @@ int main(int argc, char** argv)
         //    }
 
         SD_TRACE(QString("Uniform size : %1, %2").arg(uniDim).arg(uniDim));
-
         QVector<cv::Mat> uniCards = cardDetector.uniformSize(cards, uniDim);
 
-        // ---- EXTRACT OBJECT FEATURES FROM EACH CARD
-        cv::Mat card = uniCards[1];
-        ImageCommon::displayMat(card, true, QString("Card"));
-
+        // ---- EXTRACT OBJECT AND COMPUTE FEATURES FROM EACH CARD
+//        foreach (cv::Mat card, uniCards)
+        cv::Mat card = uniCards.last();
         {
-            cv::Size uniSize = card.size();
-            //    int objMinSize = uniSize.width*0.1;
-
-            VERBOSE = true;
-            cv::Mat procImage;
-            card.copyTo(procImage);
-
-            if (procImage.channels() > 1)
+//            cardDetector.setVerbose(true);
+            ImageCommon::displayMat(card, true, QString("Card"));
+            QVector<std::vector<cv::Point> > objectContours;
+            QVector<cv::Mat> objects;
+            cardDetector.extractObjects(card, &objectContours, &objects);
+            for (int i=0;i<objects.size();i++)
             {
-                cv::cvtColor(procImage, procImage, cv::COLOR_BGR2GRAY);
+                ImageCommon::displayMat(objects[i], true, QString("Object %1").arg(i));
+                // Compute features
+
+
             }
-
-            // Canny
-            cv::Canny(procImage, procImage, 20, 150);
-            if (VERBOSE) ImageCommon::displayMat(procImage, true, "Canny");
-
-            // Morpho
-            cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
-            cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1);
-            if (VERBOSE) ImageCommon::displayMat(procImage, true, "Morpho");
-
-
-            // Find contours
-            std::vector< std::vector<cv::Point> > contours;
-            std::vector< std::vector<cv::Point> > out;
-            cv::findContours(procImage, contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
-
-            int maxArea = 0.25 * M_PI * uniSize.width * uniSize.height;
-            int minArea = 16;
-            //    int minArea = 0.25 * M_PI * objMinSize*objMinSize;
-            int roiRadius = 0.45 * uniSize.width;
-            if (VERBOSE) SD_TRACE(QString("Roi radius : %1").arg(roiRadius));
-            //    int maxLength = 0.95*uniSize.width * M_PI;
-
-            if (VERBOSE) SD_TRACE(QString("Contours count : %1").arg(contours.size()));
-            for (size_t i=0;i<contours.size();i++)
-            {
-                std::vector<cv::Point> contour = contours[i];
-                //        double p = cv::arcLength(contour, true);
-                //        if (p < maxLength)
-                //        {
-                //            double a = cv::contourArea(contour, true);
-                cv::Rect brect = cv::boundingRect(contour);
-                int a = brect.area();
-                int dx = brect.tl().x + brect.width/2 - uniSize.width/2;
-                int dy = brect.tl().y + brect.height/2 - uniSize.height/2;
-                int maxdim = qMax(brect.width, brect.height);
-                // Select contour such that :
-                // a) bounding rect of the contour larger min area and smaller 1/4 of card size
-                // b) distance between center of the contour and the card center is smaller than card radius
-                // c) max dimension of contour is smaller than card radius
-                if (a > minArea && a < maxArea &&
-                        dx*dx + dy*dy < roiRadius*roiRadius &&
-                        maxdim < roiRadius)
-                {
-                    out.push_back(contour);
-                }
-
-                //        }
-            }
-
-            if (VERBOSE) SD_TRACE(QString("Selected contours count : %1").arg(out.size()));
-            if (VERBOSE) ImageCommon::displayContour(out, card, false, true);
-
-            // Draw filled contours as segmented image:
-            cv::Mat m(procImage.rows, procImage.cols, CV_8U, cv::Scalar::all(0));
-            for(int idx=0 ; idx < out.size(); idx++)
-            {
-                cv::Scalar color( idx );
-                cv::drawContours( m, out, idx, color, CV_FILLED);
-            }
-            if (VERBOSE) ImageCommon::displayMat(m, true, "Segmented");
-
-            for (int t=0;t<10;t++)
-            {
-                procImage = m == t;
-                if (VERBOSE) ImageCommon::displayMat(procImage, true, "object 1");
-            }
-
-            // sort by size :
-            //    std::sort(out.begin(), out.end(), less);
-
-            //    QList< std::vector<double> > objectFeatures;
-            //    QList<QRect> objects;
-            //    for (size_t i=out.size()-1;i>0;i--)
-            //    {
-            //        cv::Moments ms = cv::moments(out[i]);
-            //        double hu[7];
-            //        cv::HuMoments(ms, hu);
-            //        cv::Rect b = cv::boundingRect(out[i]);
-            //        SD_TRACE(QString("Contour area : %1").arg(b.area()));
-            //    }
-
-
         }
+
 
         return 0;
     }
@@ -252,7 +165,7 @@ int main(int argc, char** argv)
 
 // *******************************************************
 // ***********
-// *********** TESTS TO REMOVE
+// *********** TESTS TO REMOVE ***************************
 // ***********
 // *******************************************************
 
