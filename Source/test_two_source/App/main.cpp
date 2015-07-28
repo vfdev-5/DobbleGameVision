@@ -25,18 +25,11 @@ bool VERBOSE = false;
 /*!
  * OK - Find circles and mask their content = Find cards
  * OK - Rectify circles and its content = Rectify card geometry
- * - Extract objects from each circle = Extract objects from each card
+ * OK - Extract objects from each circle = Extract objects from each card
  *  -- Features : Hu moments
- *
+ *  -- Or directly use 'Match Shapes' function
  * - Compare objects
 */
-
-bool less(const std::vector<cv::Point> & c1, const std::vector<cv::Point> & c2)
-{
-    cv::Rect b1 = cv::boundingRect(c1);
-    cv::Rect b2 = cv::boundingRect(c2);
-    return b1.area() < b2.area();
-}
 
 void help()
 {
@@ -139,22 +132,60 @@ int main(int argc, char** argv)
         SD_TRACE(QString("Uniform size : %1, %2").arg(uniDim).arg(uniDim));
         QVector<cv::Mat> uniCards = cardDetector.uniformSize(cards, uniDim);
 
-        // ---- EXTRACT OBJECT AND COMPUTE FEATURES FROM EACH CARD
-//        foreach (cv::Mat card, uniCards)
-        cv::Mat card = uniCards.last();
+        // ---- EXTRACT OBJECTS AND MATCH SHAPES BETWEEN TWO CARD
+        while (!uniCards.isEmpty())
         {
-//            cardDetector.setVerbose(true);
+            cv::Mat card = uniCards.takeFirst();
             ImageCommon::displayMat(card, true, QString("Card"));
-            QVector<std::vector<cv::Point> > objectContours;
-            QVector<cv::Mat> objects;
-            cardDetector.extractObjects(card, &objectContours, &objects);
-            for (int i=0;i<objects.size();i++)
+            QVector<std::vector<cv::Point> > oContours1;
+            cardDetector.extractObjects(card, &oContours1);
+            ImageCommon::displayContour(oContours1.toStdVector(), card, false, true, "Card");
+
+            foreach (cv::Mat anotherCard, uniCards)
             {
-                ImageCommon::displayMat(objects[i], true, QString("Object %1").arg(i));
-                // Compute features
+                ImageCommon::displayMat(anotherCard, true, QString("Another card"));
+                QVector<std::vector<cv::Point> > oContours2;
+                cardDetector.extractObjects(anotherCard, &oContours2);
+                ImageCommon::displayContour(oContours2.toStdVector(), anotherCard, false, true, "Another card");
 
+                // Match shapes :
+                for (int i=0;i<oContours1.size();i++)
+                {
+                    double rmin = 1e10;
+                    int index=-1;
+                    for (int j=0;j<oContours2.size();j++)
+                    {
+                        double r = cv::matchShapes(oContours1[i], oContours2[j], CV_CONTOURS_MATCH_I2, 0.0);
+                        if (r < rmin)
+                        {
+                            rmin = r;
+                            index = j;
+                        }
+//                        SD_TRACE3("Match shapes : %1, %2, %3", i, j, r);
+                    }
 
+                    if (index >= 0 && rmin < 0.5)
+                    {
+                        // Show result :
+                        SD_TRACE3("Show result : Contour %1 with matched contour %2 with ratio = %3", i, index, rmin);
+                        std::vector<std::vector<cv::Point> > c1, c2;
+                        c1.push_back(oContours1[i]);
+                        c2.push_back(oContours2[index]);
+                        ImageCommon::displayContour(c1, card, false, true, "Card");
+                        ImageCommon::displayContour(c2, anotherCard, false, true, "Another card");
+                    }
+                    else
+                    {
+                        // No matches
+                        SD_TRACE("NO MATCHES FOUND !!!!");
+                    }
+                }
+                break;
             }
+
+
+
+
         }
 
 

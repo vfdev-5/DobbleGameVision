@@ -13,6 +13,30 @@
 namespace DGV
 {
 
+struct Compare : public std::binary_function<std::vector<cv::Point>, std::vector<cv::Point>, bool>
+{
+    enum Type {Less, Greater};
+    Compare(Type type) :
+        _type(type)
+    {
+//        switch (_type) {
+//        case Less: _func = &std::operator<; break;
+//        case Greater: _func = &std::operator>; break;
+//        default: _func = &std::operator<; break;
+//        }
+    }
+    bool operator() (const std::vector<cv::Point> & c1, const std::vector<cv::Point> c2) const
+    {
+        cv::Rect b1 = cv::boundingRect(c1);
+        cv::Rect b2 = cv::boundingRect(c2);
+//        return (*_func)(b1.area(), b2.area());
+        return _type == Greater ? b1.area() > b2.area() : b1.area() < b2.area();
+    }
+protected:
+    Type _type;
+//    bool (*_func)(const int &, const int &);
+};
+
 //******************************************************************************************
 
 CardDetector::CardDetector(int minSize, int maxSize, bool verbose) :
@@ -249,6 +273,9 @@ void CardDetector::extractObjects(const cv::Mat &card, QVector<std::vector<cv::P
         //        }
     }
     objectContours->resize(count);
+
+    // order by size (descending)
+    std::sort(objectContours->begin(), objectContours->end(), Compare(Compare::Greater));
 
     if (_verbose) SD_TRACE(QString("Selected contours count : %1").arg(count));
     if (_verbose) ImageCommon::displayContour(objectContours->toStdVector(), card, false, true);

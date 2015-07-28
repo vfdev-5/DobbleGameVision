@@ -215,23 +215,31 @@ cv::Mat displayCircles(const std::vector<cv::Vec3f> &circles, const cv::Mat &bac
 
 //******************************************************************************************
 
-cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, const cv::Mat &background, bool oneColor, bool fillContours)
+cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, const cv::Mat &background, bool oneColor, bool fillContours, const QString & winname)
 {
     cv::Mat t, img;
-    if (background.channels() == 1)
+    if (!background.empty())
     {
-        background.copyTo(t);
-        cv::Mat m[] = {t, t, t};
-        cv::merge(m, 3, img);
-    }
-    else if (background.channels() == 3)
-    {
-        background.copyTo(img);
+        if (background.channels() == 1)
+        {
+            background.copyTo(t);
+            cv::Mat m[] = {t, t, t};
+            cv::merge(m, 3, img);
+        }
+        else if (background.channels() == 3)
+        {
+            background.copyTo(img);
+        }
+        else
+        {
+            SD_TRACE("Background image should have 1 or 3 channels");
+            return img;
+        }
     }
     else
     {
-        SD_TRACE("Background image should have 1 or 3 channels");
-        return img;
+//        cv::Rect br = cv::boundingRect();
+        img = cv::Mat(500, 500, CV_8UC3, cv::Scalar::all(0));
     }
 
     if (oneColor)
@@ -247,7 +255,7 @@ cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, con
             cv::drawContours( img, contours, idx, color, fillContours ? CV_FILLED : 1);
         }
     }
-    return ImageCommon::displayMat(img, true, "Contours");
+    return ImageCommon::displayMat(img, false, winname);
 
 }
 
