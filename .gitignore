@@ -22,7 +22,10 @@ qrc_*.cpp
 ui_*.h
 Makefile*
 *-build-*
+*_build_*
 build-*
+build_*
+*install*
 
 # QtCreator
 
