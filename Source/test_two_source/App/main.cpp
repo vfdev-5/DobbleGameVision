@@ -12,6 +12,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/shape.hpp>
 
 // Project
 #include "CardDetector.h"
@@ -133,6 +134,9 @@ int main(int argc, char** argv)
         QVector<cv::Mat> uniCards = cardDetector.uniformSize(cards, uniDim);
 
         // ---- EXTRACT OBJECTS AND MATCH SHAPES BETWEEN TWO CARD
+
+        cv::Ptr< cv::HausdorffDistanceExtractor > matcher = cv::createHausdorffDistanceExtractor();
+
         while (!uniCards.isEmpty())
         {
             cv::Mat card = uniCards.takeFirst();
@@ -155,16 +159,19 @@ int main(int argc, char** argv)
                     int index=-1;
                     for (int j=0;j<oContours2.size();j++)
                     {
-                        double r = cv::matchShapes(oContours1[i], oContours2[j], CV_CONTOURS_MATCH_I2, 0.0);
+
+
+//                        double r = cv::matchShapes(oContours1[i], oContours2[j], CV_CONTOURS_MATCH_I1, 0.0);
+                        double r = matcher->computeDistance(oContours1[i], oContours2[j]);
                         if (r < rmin)
                         {
                             rmin = r;
                             index = j;
                         }
-//                        SD_TRACE3("Match shapes : %1, %2, %3", i, j, r);
+                        SD_TRACE3("Match shapes : %1, %2, %3", i, j, r);
                     }
 
-                    if (index >= 0 && rmin < 0.5)
+                    if (index >= 0)
                     {
                         // Show result :
                         SD_TRACE3("Show result : Contour %1 with matched contour %2 with ratio = %3", i, index, rmin);
@@ -177,15 +184,12 @@ int main(int argc, char** argv)
                     else
                     {
                         // No matches
-                        SD_TRACE("NO MATCHES FOUND !!!!");
+                        SD_TRACE("NO MATCHES FOUND");
                     }
                 }
-                break;
+//                break;
             }
-
-
-
-
+//            break;
         }
 
 
