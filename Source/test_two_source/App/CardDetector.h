@@ -1,6 +1,9 @@
 #ifndef CARDDETECTOR_H
 #define CARDDETECTOR_H
 
+// Std
+#include <vector>
+
 // Qt
 #include <QVector>
 
@@ -28,6 +31,8 @@ public:
     QVector<cv::Mat> uniformSize(const QVector<cv::Mat> & cards, int sizeX, int sizeY=0);
 
     void extractObjects(const cv::Mat & card, QVector<std::vector<cv::Point> > * objectContours, QVector<cv::Mat> *objectMasks=0);
+
+    cv::Mat getObject(const cv::Mat & card, const std::vector<cv::Point> & contour);
 
 protected:
 

@@ -289,9 +289,21 @@ void CardDetector::extractObjects(const cv::Mat &card, QVector<std::vector<cv::P
         {
             (*objectMasks)[idx] = cv::Mat(procImage.rows, procImage.cols, CV_8U, cv::Scalar::all(0));
             cv::Scalar color( 255 );
-            cv::drawContours( (*objectMasks)[idx], out, idx, color, 1);
+            cv::drawContours( (*objectMasks)[idx], out, idx, color, CV_FILLED);
         }
     }
+}
+
+//******************************************************************************************
+
+cv::Mat CardDetector::getObject(const cv::Mat &card, const std::vector<cv::Point> &contour)
+{
+    cv::Mat objectMask = cv::Mat(card.rows, card.cols, CV_8U, cv::Scalar::all(0));
+    cv::Scalar color( 1 );
+    std::vector<std::vector<cv::Point> > contours;
+    contours.push_back(contour);
+    cv::drawContours( objectMask, contours, 0, color, CV_FILLED);
+    return card.mul(objectMask);
 }
 
 //******************************************************************************************
