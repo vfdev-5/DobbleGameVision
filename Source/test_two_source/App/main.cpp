@@ -69,7 +69,7 @@ int main(int argc, char** argv)
 #if 0
     QStringList filesToOpen = files;
 #else
-    QStringList filesToOpen = QStringList() << files[1];
+    QStringList filesToOpen = QStringList() << files[3];
 #endif
 
     int cardSizeMin = 100;
@@ -108,28 +108,9 @@ int main(int argc, char** argv)
             return 0;
         }
 
-        // DEBUG:
-        //    for (int count=0; count<cards.size();count++)
-        //    {
-        //        const cv::Mat & card = cards.at(count);
-        //        ImageCommon::displayMat(card, true, QString("Card %1").arg(count+1));
-        //    }
-
         // ---- UNIFY SIZE OF THE CARDS
         int uniDim = (cardSizeMin + cardSizeMax)/2;
-        //    int maxDim = qMax(cards[0].cols, cards[0].rows);
-        //    for (int count=1; count<nbCards;count++)
-        //    {
-        //        const cv::Mat & card = cards.at(count);
-        //        if (maxDim < card.cols)
-        //        {
-        //            maxDim = card.cols;
-        //        }
-        //        if (maxDim < card.rows)
-        //        {
-        //            maxDim = card.rows;
-        //        }
-        //    }
+
 
         SD_TRACE(QString("Uniform size : %1, %2").arg(uniDim).arg(uniDim));
         QVector<cv::Mat> uniCards = cardDetector.uniformSize(cards, uniDim);
@@ -137,72 +118,117 @@ int main(int argc, char** argv)
         // ---- EXTRACT OBJECTS AND MATCH SHAPES BETWEEN TWO CARD
 
 //        cv::Ptr< cv::HausdorffDistanceExtractor > matcher = cv::createHausdorffDistanceExtractor();
+//        int WTA_K = 3;
+//        cv::Ptr<cv::Feature2D> extractor = cv::ORB::create(100, 1.2, 8, 31, 0, WTA_K);
+        cv::Ptr<cv::Feature2D> extractor = cv::KAZE::create();
+//        cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
+        cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("FlannBased");
+        float goodDistance = 0.25;
+        int goodMatchesMinLimit = 10;
 
-        cv::Ptr<cv::Feature2D> extractor = cv::ORB::create();
-        cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::String("BruteForce-L1"));
-
-
+//        VERBOSE = true;
         while (!uniCards.isEmpty())
         {
-            cv::Mat card = uniCards.takeFirst();
 
+            // TAKE ONE CARD
+            cv::Mat card = uniCards.takeFirst();
             if (uniCards.isEmpty()) break;
 
-            ImageCommon::displayMat(card, true, QString("Card"));
+//            ImageCommon::displayMat(card, true, QString("Card"));
             QVector<std::vector<cv::Point> > oContours1;
             cardDetector.extractObjects(card, &oContours1);
-            //ImageCommon::displayContour(oContours1.toStdVector(), card, false, true, "Card");
+            ImageCommon::displayContour(oContours1.toStdVector(), card, false, true, "Card");
 
+            // TAKE ANOTHER CARD
             foreach (cv::Mat anotherCard, uniCards)
             {
 //                ImageCommon::displayMat(anotherCard, true, QString("Another card"));
                 QVector<std::vector<cv::Point> > oContours2;
                 cardDetector.extractObjects(anotherCard, &oContours2);
-//                ImageCommon::displayContour(oContours2.toStdVector(), anotherCard, false, true, "Another card");
+                ImageCommon::displayContour(oContours2.toStdVector(), anotherCard, false, true, "Another card");
 
-                // Match shapes :
+                // LOOP ON THE OBJECTS FROM THE CARD ONE:
                 for (int i=0;i<oContours1.size();i++)
                 {
 
                     std::vector<cv::KeyPoint> keypoints_1;
                     cv::Mat descriptors_1;
                     cv::Mat object_1 = cardDetector.getObject(card, oContours1[i]);
-                    ImageCommon::displayMat(object_1, true, "Object 1");
+//                    cv::Mat object_1 = card;
+//                    ImageCommon::displayMat(object_1, true, "Object 1");
                     extractor->detectAndCompute(object_1,
                                                 cv::Mat(),
                                                 keypoints_1,
                                                 descriptors_1);
-                    SD_TRACE1("Nb of keypoints (card) : %1", keypoints_1.size());
-                    ImageCommon::displayMat(descriptors_1, true, "Descriptors 1");
+//                    SD_TRACE1("Nb of keypoints (card) : %1", keypoints_1.size());
+//                    ImageCommon::displayMat(descriptors_1, true, "Descriptors 1");
                     matcher->clear();
                     matcher->add(descriptors_1);
                     matcher->train();
 
-                    double rmin = 1e10;
-                    int index=-1;
+//                    double rmin = 1e10;
+//                    int index=-1;
+                    bool matchFound=false;
+
+                    // LOOP ON THE OBJECTS OF THE CARD TWO
                     for (int j=0;j<oContours2.size();j++)
                     {
 
                         std::vector<cv::KeyPoint> keypoints_2;
                         cv::Mat descriptors_2;
                         cv::Mat object_2 = cardDetector.getObject(anotherCard, oContours2[j]);
-                        ImageCommon::displayMat(object_2, true, "Object 2");
+//                        ImageCommon::displayMat(object_2, true, "Object 2");
                         extractor->detectAndCompute(object_2,
                                                     cv::Mat(),
                                                     keypoints_2,
                                                     descriptors_2);
-                        SD_TRACE1("Nb of keypoints (anotherCard) : %1", keypoints_2.size());
-                        ImageCommon::displayMat(descriptors_2, true, "Descriptors 2");
+//                        SD_TRACE1("Nb of keypoints (anotherCard) : %1", keypoints_2.size());
+//                        ImageCommon::displayMat(descriptors_2, true, "Descriptors 2");
 
                         std::vector<cv::DMatch> matchedKeypoints;
+
                         matcher->match(descriptors_2, matchedKeypoints);
 
-                        SD_TRACE1(" Matched keypoints count : %1", matchedKeypoints.size());
-                        cv::Mat out;
-                        std::vector<std::vector<cv::DMatch> > vectorOfMatchedKeypoints;
-                        vectorOfMatchedKeypoints.push_back(matchedKeypoints);
-                        cv::drawMatches(object_1, keypoints_1, object_2, keypoints_2, vectorOfMatchedKeypoints, out);
-                        ImageCommon::displayMat(out, true, "Matched keypoints");
+//                        SD_TRACE1(" Matched keypoints count : %1", matchedKeypoints.size());
+                        // Sort matches
+                        std::sort(matchedKeypoints.begin(), matchedKeypoints.end());
+
+                        if (VERBOSE) SD_TRACE2("Matches : min/max distances : %1, %2", matchedKeypoints[0].distance, matchedKeypoints[matchedKeypoints.size()-1].distance);
+
+                        // Select "good" matches
+                        std::vector<cv::DMatch> goodMatches;
+                        for (int i=0; i<matchedKeypoints.size();i++)
+                        {
+                            cv::DMatch m = matchedKeypoints[i];
+                            if (m.distance < goodDistance)
+                            {
+                                goodMatches.push_back(m);
+                            }
+                        }
+                        if (VERBOSE) SD_TRACE1("Good matched keypoints count : %1", goodMatches.size());
+
+                        if (VERBOSE) {
+                            // DISPLAY
+                            cv::Mat out;
+                            std::vector<std::vector<cv::DMatch> > vectorOfMatchedKeypoints;
+                            vectorOfMatchedKeypoints.push_back(goodMatches);
+                            cv::drawMatches(object_1, keypoints_1, object_2, keypoints_2, vectorOfMatchedKeypoints, out);
+                            ImageCommon::displayMat(out, true, "Matched keypoints");
+                        }
+
+                        if (goodMatches.size() >= goodMatchesMinLimit)
+                        {
+                            matchFound = true;
+
+                            // DISPLAY THE RESULT :
+                            cv::Mat out;
+                            std::vector<std::vector<cv::DMatch> > vectorOfMatchedKeypoints;
+                            vectorOfMatchedKeypoints.push_back(goodMatches);
+                            cv::drawMatches(object_1, keypoints_1, object_2, keypoints_2, vectorOfMatchedKeypoints, out);
+                            ImageCommon::displayMat(out, true, "Matched keypoints");
+
+                            break;
+                        }
 
 
 //                        double r = cv::matchShapes(oContours1[i], oContours2[j], CV_CONTOURS_MATCH_I1, 0.0);
@@ -213,6 +239,7 @@ int main(int argc, char** argv)
 //                            index = j;
 //                        }
 //                        SD_TRACE3("Match shapes : %1, %2, %3", i, j, r);
+
                     }
 
 //                    if (index >= 0)
@@ -230,11 +257,16 @@ int main(int argc, char** argv)
 //                        // No matches
 //                        SD_TRACE("NO MATCHES FOUND");
 //                    }
-                    break;
+
+
+                    // IF MATCH IS FOUND -> NO NEED TO COMPARE THESE CARDS
+                    if (matchFound)
+                    {
+                        break;
+                    }
+
                 }
-                break;
             }
-            break;
         }
 
 
