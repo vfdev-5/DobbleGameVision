@@ -36,7 +36,7 @@ void freqFilter(const cv::Mat &input, cv::Mat &output, const cv::Mat &freqMask, 
     cv::dft(img2F, img2F, cv::DFT_COMPLEX_OUTPUT | cv::DFT_SCALE);
 
     img2F = fftShift(img2F);
-//    ImageCommon::displayMat(img2F, true, "2d fft");
+    //    ImageCommon::displayMat(img2F, true, "2d fft");
 
     int w = img2F.cols;
     int h = img2F.rows;
@@ -63,7 +63,7 @@ void freqFilter(const cv::Mat &input, cv::Mat &output, const cv::Mat &freqMask, 
         t.copyTo(img2F2(r));
     }
 
-//    ImageCommon::displayMat(img2F2, true, "2d fft");
+    //    ImageCommon::displayMat(img2F2, true, "2d fft");
 
     img2F2 = fftShift(img2F2);
     cv::idft(img2F2,img2F2);
@@ -203,7 +203,7 @@ void detectCircles(const cv::Mat &image, std::vector<cv::Vec3f> & output, int mi
 
     // Match a circle template
     cv::Mat t1, t2;
-//    cv::Mat templ = ImageFiltering::getCircleKernel2D(maxRadius*2, maxRadius*2, 255);
+    //    cv::Mat templ = ImageFiltering::getCircleKernel2D(maxRadius*2, maxRadius*2, 255);
     cv::Mat templ = ImageFiltering::getCircleKernel2D(maxRadius*2, maxRadius*2, 255);
 
 
@@ -254,12 +254,33 @@ void enhance(const cv::Mat &input, cv::Mat &output, double strength)
     cv::Sobel(input, t1, CV_32F, 1, 0);
     cv::Sobel(input, t2, CV_32F, 0, 1);
     cv::Laplacian(input, t3, CV_32F, 3);
-//    ImageCommon::displayMat(t3, true, "Laplacian");
+    //    ImageCommon::displayMat(t3, true, "Laplacian");
     cv::magnitude(t1, t2, t1);
-//    ImageCommon::displayMat(t1, true, "Sobel");
+    //    ImageCommon::displayMat(t1, true, "Sobel");
     input.convertTo(t2, CV_32F);
     t2 -= strength*(t1 + t3);
     t2.convertTo(output, CV_8U);
+}
+
+//******************************************************************************************
+/*!
+ * \brief nonlinearDiffusionFiltering
+ * \param input
+ * \param output
+ */
+void nonlinearDiffusionFiltering(const cv::Mat &input, cv::Mat &output)
+{
+
+    cv::Mat img32F;
+    if ( input.depth() == CV_32F )
+        img32F = input;
+    else if ( input.depth() == CV_8U )
+        input.convertTo(img32F, CV_32F, 1.0 / 255.0, 0);
+    else if ( input.depth() == CV_16U )
+        input.convertTo(img32F, CV_32F, 1.0 / 65535.0, 0);
+
+
+
 }
 
 //******************************************************************************************

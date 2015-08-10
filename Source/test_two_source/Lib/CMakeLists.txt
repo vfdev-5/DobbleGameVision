@@ -11,7 +11,7 @@ include(Qt)
 
 ## search files:
     # define subfolders
-SET(modules Core)
+SET(modules Core 3rdparty)
 
 SET(SRC_FILES "")
 SET(INC_FILES "")

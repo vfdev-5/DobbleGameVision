@@ -120,10 +120,17 @@ int main(int argc, char** argv)
 //        cv::Ptr< cv::HausdorffDistanceExtractor > matcher = cv::createHausdorffDistanceExtractor();
 //        int WTA_K = 3;
 //        cv::Ptr<cv::Feature2D> extractor = cv::ORB::create(100, 1.2, 8, 31, 0, WTA_K);
-        cv::Ptr<cv::Feature2D> extractor = cv::KAZE::create();
+#if 1
+        cv::Ptr<cv::Feature2D> extractor = cv::AKAZE::create(cv::AKAZE::DESCRIPTOR_KAZE, 1);
 //        cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
         cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("FlannBased");
+//        int goodDistance = 35;
+        float goodDistance = 0.30;
+#else
+        cv::Ptr<cv::Feature2D> extractor = cv::KAZE::create();
+        cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("FlannBased");
         float goodDistance = 0.25;
+#endif
         int goodMatchesMinLimit = 10;
 
 //        VERBOSE = true;
@@ -142,10 +149,14 @@ int main(int argc, char** argv)
             // TAKE ANOTHER CARD
             foreach (cv::Mat anotherCard, uniCards)
             {
+
+
 //                ImageCommon::displayMat(anotherCard, true, QString("Another card"));
                 QVector<std::vector<cv::Point> > oContours2;
                 cardDetector.extractObjects(anotherCard, &oContours2);
                 ImageCommon::displayContour(oContours2.toStdVector(), anotherCard, false, true, "Another card");
+
+                StartTimer("Compare two cards");
 
                 // LOOP ON THE OBJECTS FROM THE CARD ONE:
                 for (int i=0;i<oContours1.size();i++)
@@ -194,6 +205,7 @@ int main(int argc, char** argv)
                         std::sort(matchedKeypoints.begin(), matchedKeypoints.end());
 
                         if (VERBOSE) SD_TRACE2("Matches : min/max distances : %1, %2", matchedKeypoints[0].distance, matchedKeypoints[matchedKeypoints.size()-1].distance);
+//                        SD_TRACE2("Matches : min/max distances : %1, %2", matchedKeypoints[0].distance, matchedKeypoints[matchedKeypoints.size()-1].distance);
 
                         // Select "good" matches
                         std::vector<cv::DMatch> goodMatches;
@@ -206,6 +218,7 @@ int main(int argc, char** argv)
                             }
                         }
                         if (VERBOSE) SD_TRACE1("Good matched keypoints count : %1", goodMatches.size());
+//                        SD_TRACE1("Good matched keypoints count : %1", goodMatches.size());
 
                         if (VERBOSE) {
                             // DISPLAY
@@ -219,6 +232,8 @@ int main(int argc, char** argv)
                         if (goodMatches.size() >= goodMatchesMinLimit)
                         {
                             matchFound = true;
+
+                            SD_TRACE2("Match found between object %1 on the 1st card and object %2 on the second card", i, j);
 
                             // DISPLAY THE RESULT :
                             cv::Mat out;
@@ -266,6 +281,10 @@ int main(int argc, char** argv)
                     }
 
                 }
+
+
+                StopTimer();
+
             }
         }
 

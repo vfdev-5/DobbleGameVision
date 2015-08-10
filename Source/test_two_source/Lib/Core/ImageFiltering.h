@@ -29,6 +29,8 @@ void DGV_DLL_EXPORT simplify(const cv::Mat & src, cv::Mat & dst, double f);
 
 void DGV_DLL_EXPORT detectCircles(const cv::Mat & image, std::vector<cv::Vec3f> & output, int minRadius, int maxRadius, double threshold=0.5);
 
+void DGV_DLL_EXPORT nonlinearDiffusionFiltering(const cv::Mat & input, cv::Mat & output);
+
 //******************************************************************************************
 
 }
