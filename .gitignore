@@ -41,6 +41,9 @@ build_*
 # ignore CMakeLists.txt.user
 CMakeLists.txt.user
 
+# my bash generating scripts
+*generate*.sh
+
 # Mac sheet
 .DS_Store
 

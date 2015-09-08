@@ -251,7 +251,7 @@ cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, con
         int idx = 0;
         for( ; idx < contours.size(); idx++)
         {
-            cv::Scalar color( rand()&255, rand()&255, rand()&255 );
+            cv::Scalar color( 2*idx + rand()&255, rand()&255, rand()&255 );
             cv::drawContours( img, contours, idx, color, fillContours ? CV_FILLED : 1);
         }
     }
@@ -308,4 +308,56 @@ bool isCircleLike(const std::vector<cv::Point> &contour, double tol)
 
 //******************************************************************************************
 
+template<typename T>
+void printPixel(const cv::Mat & singleBand, int x, int y)
+{
+
+    std::cout << singleBand.at<T>(y,x);
+}
+
+// Print matrix data:
+void printMat(const cv::Mat & inputImage0, const QString &windowName, int limit)
+{
+
+    cv::Mat inputImage;
+    if (inputImage0.depth() != CV_32F)
+    {
+        inputImage0.convertTo(inputImage, CV_32F);
+    }
+    else
+        inputImage = inputImage0;
+
+    QString t = windowName.isEmpty() ? "inputImage" : windowName;
+    SD_TRACE(QString("------ Print matrix : ") + t);
+    int w = inputImage.cols;
+    int h = inputImage.rows;
+    SD_TRACE("Size : " + QString::number(w) + ", " + QString::number(h));
+
+    w = w > limit ? limit : w;
+    h = h > limit ? limit : h;
+    int nbBands = inputImage.channels();
+    std::vector<cv::Mat> iChannels(nbBands);
+    cv::split(inputImage, &iChannels[0]);
+
+    for (int i=0; i<h; i++)
+    {
+        for (int j=0; j<w; j++)
+        {
+            std::cout << "(";
+            for (int k=0; k<nbBands; k++)
+            {
+                printPixel<float>(iChannels[k], j, i);
+                std::cout << " ";
+            }
+            std::cout << ")";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "------"<< std::endl;
+
+
+}
+
+//******************************************************************************
+\
 }

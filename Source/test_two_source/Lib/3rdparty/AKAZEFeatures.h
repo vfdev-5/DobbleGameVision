@@ -42,6 +42,9 @@ public:
   /// Constructor with input arguments
   AKAZEFeatures(const AKAZEOptions& options);
 
+  /// Get nonlinear diffusion evolution results
+  void getNDEvolution(std::vector<cv::Mat> & output);
+
   /// Scale Space methods
   void Allocate_Memory_Evolution();
   int Create_Nonlinear_Scale_Space(const cv::Mat& img);

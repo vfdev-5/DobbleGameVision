@@ -20,19 +20,18 @@ namespace DGV
 
 class CardDetector
 {
-    PROPERTY_ACCESSORS(int, minSize, getMinSize, setMinSize)
-    PROPERTY_ACCESSORS(int, maxSize, getMaxSize, setMaxSize)
+    PROPERTY_ACCESSORS(double, minSizeRatio, getMinSizeRatio, setMinSizeRatio)
+    PROPERTY_ACCESSORS(double, maxSizeRatio, getMaxSizeRatio, setMaxSizeRatio)
     PROPERTY_ACCESSORS(bool, verbose, isVerbose, setVerbose)
 public:
-    CardDetector(int minSize, int maxSize, bool verbose=false);
+    CardDetector(double minSizeRatio, double maxSizeRatio, bool verbose=false);
 
     QVector<cv::Mat> detectCards(const cv::Mat & src);
     cv::Mat uniformSize(const cv::Mat & card, int sizeX, int sizeY=0);
     QVector<cv::Mat> uniformSize(const QVector<cv::Mat> & cards, int sizeX, int sizeY=0);
-
     void extractObjects(const cv::Mat & card, QVector<std::vector<cv::Point> > * objectContours, QVector<cv::Mat> *objectMasks=0);
-
     cv::Mat getObject(const cv::Mat & card, const std::vector<cv::Point> & contour);
+    cv::Mat getObjectMask(const cv::Mat & card, const std::vector<cv::Point> & contour);
 
 protected:
 

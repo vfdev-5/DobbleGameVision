@@ -11,13 +11,43 @@
 // Project
 #include "Global.h"
 #include "ImageCommon.h"
-#include "ImageFiltering.h"
+#include "ImageProcessing.h"
+#include "3rdparty/AKAZEFeatures.h"
 
-namespace ImageFiltering
+
+
+
+namespace ImageProcessing
 {
 
 //******************************************************************************************
+/*!
+ * \brief The Compare struct to compare contours by their area
+ */
+struct Compare : public std::binary_function<std::vector<cv::Point>, std::vector<cv::Point>, bool>
+{
+    enum Type {Less, Greater};
+    Compare(Type type) :
+        _type(type)
+    {}
+    bool operator() (const std::vector<cv::Point> & c1, const std::vector<cv::Point> c2) const
+    {
+        cv::Rect b1 = cv::boundingRect(c1);
+        cv::Rect b2 = cv::boundingRect(c2);
+        return _type == Greater ? b1.area() > b2.area() : b1.area() < b2.area();
+    }
+protected:
+    Type _type;
+};
 
+//******************************************************************************************
+/*!
+ * \brief freqFilter
+ * \param input
+ * \param output
+ * \param freqMask should zero-one binary mask
+ * \param inside
+ */
 void freqFilter(const cv::Mat &input, cv::Mat &output, const cv::Mat &freqMask, bool inside)
 {
     if (freqMask.type() != CV_32F)
@@ -36,7 +66,7 @@ void freqFilter(const cv::Mat &input, cv::Mat &output, const cv::Mat &freqMask, 
     cv::dft(img2F, img2F, cv::DFT_COMPLEX_OUTPUT | cv::DFT_SCALE);
 
     img2F = fftShift(img2F);
-    //    ImageCommon::displayMat(img2F, true, "2d fft");
+    // ImageCommon::displayMat(img2F, true, "2d fft");
 
     int w = img2F.cols;
     int h = img2F.rows;
@@ -138,7 +168,7 @@ cv::Mat getGaussianKernel2D(const cv::Size &size, double sigmaX, double sigmaY)
  * \param value is the mask value, default 255
  * \return
  */
-cv::Mat getCircleKernel2D(const cv::Size &size, int value, int type)
+cv::Mat getCircleKernel2D(const cv::Size &size, double value, int type)
 {
     int w2 = size.width;
     int h2 = size.height;
@@ -203,8 +233,8 @@ void detectCircles(const cv::Mat &image, std::vector<cv::Vec3f> & output, int mi
 
     // Match a circle template
     cv::Mat t1, t2;
-    //    cv::Mat templ = ImageFiltering::getCircleKernel2D(maxRadius*2, maxRadius*2, 255);
-    cv::Mat templ = ImageFiltering::getCircleKernel2D(maxRadius*2, maxRadius*2, 255);
+    //    cv::Mat templ = ImageProcessing::getCircleKernel2D(maxRadius*2, maxRadius*2, 255);
+    cv::Mat templ = ImageProcessing::getCircleKernel2D(maxRadius*2, maxRadius*2, 255);
 
 
     ImageCommon::displayMat(templ, true, "Template");
@@ -270,7 +300,6 @@ void enhance(const cv::Mat &input, cv::Mat &output, double strength)
  */
 void nonlinearDiffusionFiltering(const cv::Mat &input, cv::Mat &output)
 {
-
     cv::Mat img32F;
     if ( input.depth() == CV_32F )
         img32F = input;
@@ -279,8 +308,141 @@ void nonlinearDiffusionFiltering(const cv::Mat &input, cv::Mat &output)
     else if ( input.depth() == CV_16U )
         input.convertTo(img32F, CV_32F, 1.0 / 65535.0, 0);
 
+    CV_Assert( ! img32F.empty() );
 
 
+    cv::AKAZEOptions options;
+    options.img_width = img32F.cols;
+    options.img_height = img32F.rows;
+    options.omax = 1;
+    options.nsublevels = 12;
+
+    cv::AKAZEFeatures ndf(options);
+    ndf.Create_Nonlinear_Scale_Space(img32F);
+
+    std::vector<cv::Mat> evolution;
+    ndf.getNDEvolution(evolution);
+
+//    for (int i=0; i<evolution.size(); i++)
+//    {
+//        ImageCommon::displayMat(evolution[i], true, QString("Nonlinear filtered image : %1").arg(i));
+//    }
+
+    evolution[evolution.size()-1].copyTo(output);
+
+}
+
+//******************************************************************************************
+
+void detectObjects(const cv::Mat &image, QVector<std::vector<cv::Point> > *objectContours,
+                   double minSizeRatio, double maxSizeRatio,
+                   DetectedObjectType type, bool verbose)
+{
+    if (!objectContours)
+    {
+        SD_TRACE("CardDetector::extractObjects : ObjectContours is null");
+        return;
+    }
+
+    cv::Size size = image.size();
+    cv::Mat procImage;
+    image.copyTo(procImage);
+    if (procImage.channels() > 1)
+    {
+        cv::cvtColor(procImage, procImage, cv::COLOR_BGR2GRAY);
+    }
+
+
+    // Median blur
+    int medianBlurSize = 5;
+    cv::medianBlur(procImage, procImage, medianBlurSize);
+    if (verbose) ImageCommon::displayMat(procImage, true, "Median");
+
+//    // Enhance contours :
+//    ImageProcessing::enhance(procImage, procImage);
+//    if (_verbose) ImageCommon::displayMat(procImage, true, "Enhance");
+
+    // Canny
+    int t1 = 20;
+    int t2 = 150;
+    cv::Canny(procImage, procImage, t1, t2);
+    if (verbose) ImageCommon::displayMat(procImage, true, "Canny");
+
+    // Morpho
+    cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
+    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), 2);
+    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho");
+
+    // Find contours
+    std::vector< std::vector<cv::Point> > contours;
+    cv::findContours(procImage, contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
+    objectContours->clear();
+    objectContours->resize(contours.size());
+
+
+    // Define constraints:
+    int totalArea = size.width * size.height;
+    int maxArea = maxSizeRatio*maxSizeRatio*totalArea;
+    int minArea = minSizeRatio*minSizeRatio*totalArea;
+
+//    int roiRadius = 0.45 * size.width;
+//    if (verbose) SD_TRACE(QString("Roi radius : %1").arg(roiRadius));
+    //    int maxLength = 0.95*size.width * M_PI;
+    if (verbose) SD_TRACE(QString("Contours count : %1").arg(contours.size()));
+
+    int count=0;
+    for (size_t i=0;i<contours.size();i++)
+    {
+        std::vector<cv::Point> contour = contours[i];
+
+        cv::Rect brect = cv::boundingRect(contour);
+        int a = brect.area();
+//        int dx = brect.tl().x + brect.width/2 - size.width/2;
+//        int dy = brect.tl().y + brect.height/2 - size.height/2;
+//        int maxdim = qMax(brect.width, brect.height);
+
+        // Select contour such that :
+        // a) bounding rect of the contour larger min area and smaller than max area
+
+        // REMOVE b) distance between center of the contour and the card center is smaller than card radius
+
+        // REMOVE c) max dimension of contour is smaller than card radius
+
+        // d) contour brect should not touch (+/- 1 pixel) image boundaries
+
+        if (a > minArea && a < maxArea &&
+//                dx*dx + dy*dy < roiRadius*roiRadius &&
+//                maxdim < roiRadius &&
+
+                brect.x > 1 && brect.y > 1 &&
+                brect.br().x < size.width-2 &&  brect.br().y < size.height-2)
+        {
+            (*objectContours)[count].swap(contour);
+            count++;
+        }
+        //        }
+    }
+    objectContours->resize(count);
+
+    // order by size (descending)
+    std::sort(objectContours->begin(), objectContours->end(), Compare(Compare::Greater));
+
+    if (verbose) SD_TRACE(QString("Selected contours count : %1").arg(count));
+    if (verbose) ImageCommon::displayContour(objectContours->toStdVector(), image, false, true);
+
+
+}
+
+//******************************************************************************************
+
+cv::Mat getObjectMask(const cv::Size &size, const std::vector<cv::Point> & contour)
+{
+    cv::Mat objectMask = cv::Mat(size.height, size.width, CV_8U, cv::Scalar::all(0));
+    cv::Scalar color( 1 );
+    std::vector<std::vector<cv::Point> > contours;
+    contours.push_back(contour);
+    cv::drawContours( objectMask, contours, 0, color, CV_FILLED);
+    return objectMask;
 }
 
 //******************************************************************************************

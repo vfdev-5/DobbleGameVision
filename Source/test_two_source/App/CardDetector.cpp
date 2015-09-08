@@ -8,7 +8,7 @@
 // Project
 #include "CardDetector.h"
 #include "Core/ImageCommon.h"
-#include "Core/ImageFiltering.h"
+#include "Core/ImageProcessing.h"
 
 namespace DGV
 {
@@ -39,9 +39,9 @@ protected:
 
 //******************************************************************************************
 
-CardDetector::CardDetector(int minSize, int maxSize, bool verbose) :
-    _minSize(minSize),
-    _maxSize(maxSize),
+CardDetector::CardDetector(double minSizeRatio, double maxSizeRatio, bool verbose) :
+    _minSizeRatio(minSizeRatio),
+    _maxSizeRatio(maxSizeRatio),
     _verbose(verbose)
 {
 }
@@ -63,25 +63,28 @@ QVector<cv::Mat> CardDetector::detectCards(const cv::Mat &src)
         src.copyTo(procImage);
     }
 
-    double fs = 0.20;
+    double fs = 0.15;
     cv::Size size(fs*procImage.cols, fs*procImage.rows);
     double sigmaX = size.width*0.25;
     double sigmaY = size.height*0.25;
-    cv::Mat freqMask = ImageFiltering::getGaussianKernel2D(size, sigmaX, sigmaY);
-    ImageFiltering::freqFilter(procImage, procImage, freqMask);
-
+    cv::Mat freqMask = ImageProcessing::getGaussianKernel2D(size, sigmaX, sigmaY);
+    ImageProcessing::freqFilter(procImage, procImage, freqMask);
     if (_verbose) ImageCommon::displayMat(procImage, true, "Low freq image");
 
-    //    double f = 5.0;
-    //    ImageFiltering::simplify(procImage, procImage, f);
-    //    ImageCommon::displayMat(procImage, true, "Resized");
+//    // median filter
+//    cv::medianBlur(procImage, procImage, 11);
+//    if (_verbose) ImageCommon::displayMat(procImage, true, "Median Filter image");
+
+//    double f = 5.0;
+//    ImageProcessing::simplify(procImage, procImage, f);
+//    if (_verbose) ImageCommon::displayMat(procImage, true, "Resized");
 
     // Derivate
     cv::Mat t1, t2, t3;
     cv::Scharr(procImage, t1, CV_32F, 1, 0);
     cv::Scharr(procImage, t2, CV_32F, 0, 1);
-    if (_verbose) ImageCommon::displayMat(t1, true, "Scharr x");
-    if (_verbose) ImageCommon::displayMat(t2, true, "Scharr y");
+//    if (_verbose) ImageCommon::displayMat(t1, true, "Scharr x");
+//    if (_verbose) ImageCommon::displayMat(t2, true, "Scharr y");
 
     cv::magnitude(t1, t2, t3);
     double minVal, maxVal;
@@ -110,8 +113,8 @@ QVector<cv::Mat> CardDetector::detectCards(const cv::Mat &src)
     std::vector< std::vector<cv::Point> > out;
     cv::findContours(procImage, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 
-    int minArea = _minSize*_minSize;
-    int maxArea = _maxSize*_maxSize;
+    int minArea = _minSizeRatio*_minSizeRatio*procImage.rows * procImage.cols;
+    int maxArea = _maxSizeRatio*_maxSizeRatio*procImage.rows * procImage.cols;
     if (_verbose) SD_TRACE(QString("Min area : %1").arg(minArea));
     if (_verbose) SD_TRACE(QString("Contours count : %1").arg(contours.size()));
     for (size_t i=0;i<contours.size();i++)
@@ -143,7 +146,7 @@ QVector<cv::Mat> CardDetector::detectCards(const cv::Mat &src)
         brect.width -= brect.width * marginFactor * 2;
         brect.height -= brect.height * marginFactor * 2;
 
-        cv::Mat mask = ImageFiltering::getCircleKernel2D(brect.size(), 1, CV_8U);
+        cv::Mat mask = ImageProcessing::getCircleKernel2D(brect.size(), 1, CV_8U);
         std::vector<cv::Mat> mx(src.channels());
         for (int j=0;j<src.channels();j++)
         {
@@ -215,7 +218,7 @@ void CardDetector::extractObjects(const cv::Mat &card, QVector<std::vector<cv::P
     if (_verbose) ImageCommon::displayMat(procImage, true, "Median");
 
 //    // Enhance contours :
-//    ImageFiltering::enhance(procImage, procImage);
+//    ImageProcessing::enhance(procImage, procImage);
 //    if (_verbose) ImageCommon::displayMat(procImage, true, "Enhance");
 
     // Canny
@@ -298,12 +301,20 @@ void CardDetector::extractObjects(const cv::Mat &card, QVector<std::vector<cv::P
 
 cv::Mat CardDetector::getObject(const cv::Mat &card, const std::vector<cv::Point> &contour)
 {
+    cv::Mat objectMask = getObjectMask(card, contour);
+    return card.mul(objectMask);
+}
+
+//******************************************************************************************
+
+cv::Mat CardDetector::getObjectMask(const cv::Mat &card, const std::vector<cv::Point> &contour)
+{
     cv::Mat objectMask = cv::Mat(card.rows, card.cols, CV_8U, cv::Scalar::all(0));
     cv::Scalar color( 1 );
     std::vector<std::vector<cv::Point> > contours;
     contours.push_back(contour);
     cv::drawContours( objectMask, contours, 0, color, CV_FILLED);
-    return card.mul(objectMask);
+    return objectMask;
 }
 
 //******************************************************************************************

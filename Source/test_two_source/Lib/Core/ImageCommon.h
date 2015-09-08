@@ -32,6 +32,8 @@ bool DGV_DLL_EXPORT isCircleLike(const std::vector<cv::Point> & contour, double 
 
 //******************************************************************************************
 
+void DGV_DLL_EXPORT printMat(const cv::Mat & inputImage, const QString &windowName=QString(), int limit=10);
+
 }
 
 #endif // IMAGECOMMON_H

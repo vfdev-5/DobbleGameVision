@@ -18,7 +18,7 @@
 // Project
 #include "Core/Global.h"
 #include "Core/ImageCommon.h"
-#include "Core/ImageFiltering.h"
+#include "Core/ImageProcessing.h"
 
 
 bool VERBOSE = true;
@@ -72,9 +72,12 @@ int main(int argc, char** argv)
         ImageCommon::displayMat(inImage, true, "Input image");
 
         cv::Mat procImg;
-        ImageFiltering::nonlinearDiffusionFiltering(inImage, procImg);
+        ImageProcessing::nonlinearDiffusionFiltering(inImage, procImg);
+        ImageCommon::displayMat(procImg, true, "NDFiltering image");
 
-//        ImageCommon::displayMat(procImg, true, "NDFiltering image");
+        // Compare with median filter
+        cv::medianBlur(inImage, procImg, 11);
+        ImageCommon::displayMat(procImg, true, "Median Filter image");
 
     }
 

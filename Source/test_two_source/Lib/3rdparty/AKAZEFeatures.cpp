@@ -42,6 +42,21 @@ AKAZEFeatures::AKAZEFeatures(const AKAZEOptions& options) : options_(options) {
   Allocate_Memory_Evolution();
 }
 
+
+/* ************************************************************************* */
+/**
+ * @brief This method return stack of images computed during nonlinear diffusion filtering
+ */
+void AKAZEFeatures::getNDEvolution(std::vector<Mat> & output)
+{
+    output.clear();
+    output.resize(evolution_.size());
+    for (int i=0; i<evolution_.size();i++)
+    {
+        output[i] = evolution_[i].Lt;
+    }
+}
+
 /* ************************************************************************* */
 /**
  * @brief This method allocates the memory for the nonlinear diffusion evolution
