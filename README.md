@@ -1,4 +1,4 @@
-# Computer vision for 'Double' game
+# Computer vision for 'Dobble' game
 
 Idea : Support player with computer vision system to recognize and compare objects on the cards
 
@@ -31,6 +31,7 @@ Idea : Support player with computer vision system to recognize and compare objec
 
 
 Problems :
+
     1) Card contours are too weak -> no card detection
         - weak card contours, strong small contours
         - weak card contours are neglected on threshold
