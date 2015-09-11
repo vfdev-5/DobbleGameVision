@@ -382,5 +382,31 @@ void printMat(const cv::Mat & inputImage0, const QString &windowName, int limit)
 }
 
 //******************************************************************************
+
+void convertTo8U(const cv::Mat &input, cv::Mat &output)
+{
+
+    int nbOfChannels = input.channels();
+
+    std::vector<cv::Mat> iChannels(nbOfChannels);
+    std::vector<cv::Mat> oChannels(nbOfChannels);
+    cv::split(input, &iChannels[0]);
+
+    for (int i=0; i<nbOfChannels; i++)
+    {
+        double minVal, maxVal;
+        cv::minMaxLoc(iChannels[i], &minVal, &maxVal);
+        double a, b;
+        a = 255.0 /(maxVal - minVal);
+        b = -255.0 * minVal / (maxVal - minVal);
+        iChannels[i].convertTo(oChannels[i], CV_8U, a, b);
+    }
+    cv::merge(oChannels, output);
+
+
+
+}
+
+//******************************************************************************
 \
 }

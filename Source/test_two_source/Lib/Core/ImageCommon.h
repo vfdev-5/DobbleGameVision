@@ -33,6 +33,8 @@ bool DGV_DLL_EXPORT isEllipseLike(const std::vector<cv::Point> & contour, double
 
 bool DGV_DLL_EXPORT isCircleLike(const std::vector<cv::Point> & contour, double tol=1e-2);
 
+void DGV_DLL_EXPORT convertTo8U(const cv::Mat & input, cv::Mat & output);
+
 //******************************************************************************************
 
 void DGV_DLL_EXPORT printMat(const cv::Mat & inputImage, const QString &windowName=QString(), int limit=10);

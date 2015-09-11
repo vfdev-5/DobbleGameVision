@@ -25,39 +25,23 @@ void ImageProcessingTest::detectObjectsTest()
 {
 
     cv::Mat in = generateSimpleGeometries();
+    in.convertTo(in, CV_32F);
+
     cv::Mat noise(in.rows, in.cols, in.type());
-    cv::randu(noise, 170, 90);
+//    cv::randu(noise, 170, 90);
+    cv::randn(noise, 100, 25);
     in = in + noise;
 
-    ImageCommon::displayMat(in);
+    ImageCommon::displayMat(in, true);
 
-
+    // Enhance contours
     cv::Mat t;
-    ImageProcessing::edgeStrength(in, t);
-    ImageCommon::displayMat(t, true, "edge strength");
+    ImageProcessing::edgeStrength(in, t, 5);
+//    ImageCommon::displayMat(t, true, "edge strength");
+    in = in.mul(t);
+    ImageCommon::convertTo8U(in, in);
+    ImageCommon::displayMat(in, true, "In enchanced");
 
-//    cv::Mat t1, t2, t3;
-//    int ksize = 3;
-//    if (in.depth() < CV_32F)
-//    {
-//        in.convertTo(t1, CV_32F);
-//    }
-//    else
-//    {
-//        t1 = in;
-//    }
-
-//    cv::blur(t1, t1, cv::Size(ksize, ksize));
-//    cv::Mat k(ksize, ksize, CV_8U, cv::Scalar::all(1));
-//    cv::dilate(t1, t2, k);
-//    cv::erode(t1, t3, k);
-//    t2 = t1 - t2;
-//    t3 = t1 - t3;
-
-//    ImageCommon::displayMat(t3, true, "blur - erode");
-//    ImageCommon::displayMat(t2, true, "blur - dilate");
-
-    in = t;
 
     ImageProcessing::Contours objects;
 
@@ -67,14 +51,17 @@ void ImageProcessingTest::detectObjectsTest()
     cv::Mat mask = cv::Mat();
     bool verbose = true;
 
+
     ImageProcessing::detectObjects(in, &objects,
                                    minSizeRatio, maxSizeRatio,
                                    type, mask,
                                    verbose);
 
     SD_TRACE1("Object count = %1", objects.size());
-//    QVERIFY(8==objects.size());
-    ImageCommon::displayContours(objects.toStdVector(), in, false, true);
+
+//    QVERIFY(16 == objects.size());
+
+//    ImageCommon::displayContours(objects.toStdVector(), in, false, true);
 
 //    ImageProcessing::Contours::iterator it = objects.begin();
 //    for (int i=0;it!=objects.end();++it, i++)
@@ -82,7 +69,6 @@ void ImageProcessingTest::detectObjectsTest()
 //        std::vector< std::vector<cv::Point> > testContours;
 //        testContours.push_back(*it);
 //        ImageCommon::displayContours(testContours, in);
-
 //    }
 
 

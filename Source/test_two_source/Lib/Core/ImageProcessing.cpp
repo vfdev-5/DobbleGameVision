@@ -374,7 +374,7 @@ void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
 
     if (input.depth() < CV_32F)
     {
-        cv::max(t2, t3, t1);
+        cv::min(t2, t3, t1);
         double minVal, maxVal;
         cv::minMaxLoc(t1, &minVal, &maxVal);
         double a, b;
@@ -384,7 +384,7 @@ void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
     }
     else
     {
-        cv::max(t2, t3, output);
+        cv::min(t2, t3, output);
     }
 
 }
@@ -427,8 +427,7 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     if (verbose) SD_TRACE1("Detected object max size : %1", imageDim*maxSizeRatio);
 
     // Median blur
-    int medianBlurSize = imageDim*minSizeRatio/4.0;
-    if (medianBlurSize % 2 == 0) medianBlurSize++;
+    int medianBlurSize = 5;
     cv::medianBlur(procImage, procImage, medianBlurSize);
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
 
