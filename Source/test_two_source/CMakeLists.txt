@@ -24,6 +24,7 @@ find_package( Qt REQUIRED )
 add_subdirectory("Lib")
 add_subdirectory("App")
 add_subdirectory("Sandbox")
+add_subdirectory("Tests")
 
 if(WIN32)
     ## install opencv library dlls :

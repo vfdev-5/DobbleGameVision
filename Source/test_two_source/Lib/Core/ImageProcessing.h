@@ -20,7 +20,7 @@ cv::Mat DGV_DLL_EXPORT fftShift(const cv::Mat & input);
 
 void DGV_DLL_EXPORT freqFilter(const cv::Mat & input, cv::Mat & output, const cv::Mat & freqMask=cv::Mat::ones(10, 10, CV_32F), bool inside=true);
 
-void DGV_DLL_EXPORT enhance(const cv::Mat & input, cv::Mat & output, double strength = 0.25);
+void DGV_DLL_EXPORT enhance(const cv::Mat & input, cv::Mat & output, double strength = 0.25, bool laplacianOnly=true);
 
 cv::Mat DGV_DLL_EXPORT getGaussianKernel2D(const cv::Size & size, double sigmaX, double sigmaY);
 
@@ -33,8 +33,13 @@ void DGV_DLL_EXPORT simplify(const cv::Mat & src, cv::Mat & dst, double f);
 
 void DGV_DLL_EXPORT nonlinearDiffusionFiltering(const cv::Mat & input, cv::Mat & output);
 
+void DGV_DLL_EXPORT edgeStrength(const cv::Mat & input, cv::Mat & output, int ksize=3);
+
+
 // Detection methods
 //******************************************************************************************
+
+typedef QVector<std::vector<cv::Point> > Contours;
 
 void DGV_DLL_EXPORT detectCircles(const cv::Mat & image, std::vector<cv::Vec3f> & output, int minRadius, int maxRadius, double threshold=0.5);
 
@@ -42,12 +47,15 @@ cv::Mat DGV_DLL_EXPORT getObjectMask(const cv::Size &size, const std::vector<cv:
 
 enum DetectedObjectType {
     ANY=0,
-    CIRCLE_LIKE=1,
+    ELLIPSE_LIKE=1,
 };
 
-void DGV_DLL_EXPORT detectObjects(const cv::Mat & image, QVector<std::vector<cv::Point> > * objectContours,
-                                  double minSizeRatio=0.1, double maxSizeRatio=0.7,
-                                  DetectedObjectType type=ANY, bool verbose=false);
+void detectObjects(const cv::Mat & image,
+                                  Contours * objectContours,
+                                  double minSizeRatio=0.0, double maxSizeRatio=1.0,
+                                  DetectedObjectType type=ANY, const cv::Mat & mask=cv::Mat(),
+                                  bool verbose=false);
+
 
 
 //******************************************************************************************

@@ -108,6 +108,7 @@ int main(int argc, char** argv)
         ImageProcessing::detectObjects(procImage, &cardContours,
                                        0.1, 0.7,
                                        ImageProcessing::ANY,
+                                       cv::Mat(),
                                        true);
 
         return 0;
@@ -140,7 +141,7 @@ int main(int argc, char** argv)
 
             QVector<std::vector<cv::Point> > oContours1;
             cardDetector.extractObjects(cardOne, &oContours1);
-            ImageCommon::displayContour(oContours1.toStdVector(), cardOne, false, true, "Card 1");
+            ImageCommon::displayContours(oContours1.toStdVector(), cardOne, false, true, "Card 1");
 
             // TAKE ANOTHER CARD
             foreach (cv::Mat cardTwo, uniCards)
@@ -148,7 +149,7 @@ int main(int argc, char** argv)
 
                 QVector<std::vector<cv::Point> > oContours2;
                 cardDetector.extractObjects(cardTwo, &oContours2);
-                ImageCommon::displayContour(oContours2.toStdVector(), cardTwo, false, true, "Card 2");
+                ImageCommon::displayContours(oContours2.toStdVector(), cardTwo, false, true, "Card 2");
 
 
                 // LOOP ON THE OBJECTS FROM THE CARD ONE:

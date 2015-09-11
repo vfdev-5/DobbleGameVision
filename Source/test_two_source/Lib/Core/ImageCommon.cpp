@@ -215,7 +215,7 @@ cv::Mat displayCircles(const std::vector<cv::Vec3f> &circles, const cv::Mat &bac
 
 //******************************************************************************************
 
-cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, const cv::Mat &background, bool oneColor, bool fillContours, const QString & winname)
+cv::Mat displayContours(const std::vector<std::vector<cv::Point> > &contours, const cv::Mat &background, bool oneColor, bool fillContours, const QString & winname)
 {
     cv::Mat t, img;
     if (!background.empty())
@@ -261,7 +261,7 @@ cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, con
 
 //******************************************************************************************
 
-cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, const std::vector<cv::Vec4i> &hierarchy, const cv::Mat &background)
+cv::Mat displayContours(const std::vector<std::vector<cv::Point> > &contours, const std::vector<cv::Vec4i> &hierarchy, const cv::Mat &background)
 {
     cv::Mat t, img;
     if (background.channels() == 1)
@@ -291,20 +291,43 @@ cv::Mat displayContour(const std::vector<std::vector<cv::Point> > &contours, con
 
 //******************************************************************************************
 /*!
- * \brief isCircleLike Tests if contour is circle like.
+ * \brief isEllipseLike Tests if contour is ellipse like
  * \param contour
- * \return true if ratio = length(contour)/area(contour) ~ pi*(a+b)/(pi*a*b) with the tolerance
+ * \param tol
+ * \return true if ratio = length(contour)/area(contour) ~ pi*(a+b)/(pi*a*b) with the tolerance, where a=brect(contour).width and b=brect(contour).height
+ *  and length(contour) ~ pi*(a+b)
  */
-bool isCircleLike(const std::vector<cv::Point> &contour, double tol)
+bool isEllipseLike(const std::vector<cv::Point> &contour, double tol)
 {
     cv::Rect brect = cv::boundingRect(contour);
     double l = cv::arcLength(contour, true);
     double a = cv::contourArea(contour);
     double r = l/a;
     double r2 = 2.0*(brect.width+brect.height)/(brect.width*brect.height);
-    return qAbs(r-r2) < tol;
+    double l2 = M_PI*(brect.width+brect.height)*0.5;
+    return (qAbs(r-r2) < tol) && (qAbs(l-l2) < 5.0*tol*l);
 
 }
+
+//******************************************************************************
+///*!
+// * \brief isCircleLike Tests if contour is circle like or ratio length/area is about 2/R and
+// * \param contour
+// * \param tol
+// * \return true if ratio = length(contour)/area(contour) ~ 2/R with the tolerance, where R=0.5*mean(brect(contour).width + brect(contour).height)
+// * and area(contour) ~ pi*R^2
+// */
+//bool isCircleLike(const std::vector<cv::Point> &contour, double tol)
+//{
+//    cv::Rect brect = cv::boundingRect(contour);
+//    double l = cv::arcLength(contour, true);
+//    double a = cv::contourArea(contour);
+//    double r = l/a;
+//    double R = 0.25*(brect.width+brect.height);
+//    double r2 = 2.0/R;
+//    double a2 = M_PI*R*R;
+//    return (qAbs(r-r2) < tol) && (qAbs(a-a2) < 5.0*tol*a2);
+//}
 
 //******************************************************************************************
 

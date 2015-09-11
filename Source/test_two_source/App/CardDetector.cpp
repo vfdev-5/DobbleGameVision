@@ -124,14 +124,14 @@ QVector<cv::Mat> CardDetector::detectCards(const cv::Mat &src)
         int a = brect.area();
         if (a > minArea &&
                 a < maxArea &&
-                ImageCommon::isCircleLike(contour))
+                ImageCommon::isEllipseLike(contour))
         {
             out.push_back(contour);
         }
     }
 
     if (_verbose) SD_TRACE(QString("Selected contours count : %1").arg(out.size()));
-    if (_verbose) ImageCommon::displayContour(contours, procImage);
+    if (_verbose) ImageCommon::displayContours(contours, procImage);
 
 
     QVector<cv::Mat> cards(out.size());
@@ -281,7 +281,7 @@ void CardDetector::extractObjects(const cv::Mat &card, QVector<std::vector<cv::P
     std::sort(objectContours->begin(), objectContours->end(), Compare(Compare::Greater));
 
     if (_verbose) SD_TRACE(QString("Selected contours count : %1").arg(count));
-    if (_verbose) ImageCommon::displayContour(objectContours->toStdVector(), card, false, true);
+    if (_verbose) ImageCommon::displayContours(objectContours->toStdVector(), card, false, true);
 
     // Draw filled contours as segmented image:
     if (objectMasks) {

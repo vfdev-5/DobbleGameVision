@@ -34,7 +34,7 @@ struct Compare : public std::binary_function<std::vector<cv::Point>, std::vector
     {
         cv::Rect b1 = cv::boundingRect(c1);
         cv::Rect b2 = cv::boundingRect(c2);
-        return _type == Greater ? b1.area() > b2.area() : b1.area() < b2.area();
+        return _type == Greater ? b1.area() < b2.area() : b1.area() > b2.area();
     }
 protected:
     Type _type;
@@ -278,17 +278,21 @@ void simplify(const cv::Mat &src, cv::Mat &dst, double f)
  * \param input
  * \param output
  */
-void enhance(const cv::Mat &input, cv::Mat &output, double strength)
+void enhance(const cv::Mat &input, cv::Mat &output, double strength, bool laplacianOnly)
 {
-    cv::Mat t1, t2, t3;
-    cv::Sobel(input, t1, CV_32F, 1, 0);
-    cv::Sobel(input, t2, CV_32F, 0, 1);
+    cv::Mat t1, t2, t3, t4;
     cv::Laplacian(input, t3, CV_32F, 3);
-    //    ImageCommon::displayMat(t3, true, "Laplacian");
-    cv::magnitude(t1, t2, t1);
-    //    ImageCommon::displayMat(t1, true, "Sobel");
+//    ImageCommon::displayMat(t3, true, "Laplacian");
+    if (!laplacianOnly)
+    {
+        cv::Scharr(input, t1, CV_32F, 1, 0);
+        cv::Scharr(input, t2, CV_32F, 0, 1);
+        cv::magnitude(t1, t2, t1);
+        //    ImageCommon::displayMat(t1, true, "Sobel");
+    }
     input.convertTo(t2, CV_32F);
-    t2 -= strength*(t1 + t3);
+    t2 -= strength*t3;
+    if (!laplacianOnly) t2 -= strength*t1;
     t2.convertTo(output, CV_8U);
 }
 
@@ -333,40 +337,120 @@ void nonlinearDiffusionFiltering(const cv::Mat &input, cv::Mat &output)
 }
 
 //******************************************************************************************
-
-void detectObjects(const cv::Mat &image, QVector<std::vector<cv::Point> > *objectContours,
-                   double minSizeRatio, double maxSizeRatio,
-                   DetectedObjectType type, bool verbose)
+/*!
+ * \brief edgeStrength Basic algorithm to get enhance the edges
+ * \param input single band image of any depth
+ * \param ksize
+ * \param output
+ * Algorithm :
+ *  i1 = blur(input)
+ *  i2 = dilate(i1)
+ *  i3 = erode(i1)
+ *  out = min(i1 - i2, i1 - i3)
+ */
+void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
 {
+    cv::Mat t1, t2, t3;
+    if (input.depth() < CV_32F)
+    {
+        input.convertTo(t1, CV_32F);
+    }
+    else
+    {
+        t1 = input;
+    }
+    // blur
+    cv::blur(t1, t1, cv::Size(ksize, ksize));
+
+
+    // dilate/erode
+    cv::Mat k(ksize, ksize, CV_8U, cv::Scalar::all(1));
+    cv::dilate(t1, t2, k);
+    cv::erode(t1, t3, k);
+
+    // min(blur - dilate, blur - erode)
+    t2 = t1 - t2;
+    t3 = t1 - t3;
+
+    if (input.depth() < CV_32F)
+    {
+        cv::max(t2, t3, t1);
+        double minVal, maxVal;
+        cv::minMaxLoc(t1, &minVal, &maxVal);
+        double a, b;
+        a = 255.0 /(maxVal - minVal);
+        b = -255.0 * minVal / (maxVal - minVal);
+        t1.convertTo(output, input.depth(), a, b);
+    }
+    else
+    {
+        cv::max(t2, t3, output);
+    }
+
+}
+
+
+//******************************************************************************************
+/*!
+ * \brief detectObjects Method to detect objects on the image
+ * \param image input image of type CV_8U (8 bits single channel)
+ * \param objectContours output contours
+ * \param minSizeRatio Minimal size ratio of detected objects, as a factor of the mean of the image dimensions
+ * \param maxSizeRatio Maximal size ratio of detected objects, as a factor of the mean of the image dimensions
+ * \param type Object type to detect. Possible values : ANY (any type of objects), ELLIPSE_LIKE (ellipse like objects: length/area ~ (a+b)/(a*b) and length ~ pi*(a+b) )
+ * \param mask Binary mask matrix ({0,1}) indicates where to search the objects. Object should entirely be in the mask zone, otherwise it is rejected
+ * \param verbose Option to display intermediate processing result
+ */
+void detectObjects(const cv::Mat &image, Contours *objectContours,
+                   double minSizeRatio, double maxSizeRatio,
+                   DetectedObjectType type, const cv::Mat &mask,
+                   bool verbose)
+{
+    if (image.type() != CV_8U) {
+        SD_TRACE("detectObjects : Input image should a 8 bits single channel matrix");
+        return;
+    }
+
+
     if (!objectContours)
     {
-        SD_TRACE("CardDetector::extractObjects : ObjectContours is null");
+        SD_TRACE("detectObjects : ObjectContours is null");
         return;
     }
 
     cv::Size size = image.size();
     cv::Mat procImage;
     image.copyTo(procImage);
-    if (procImage.channels() > 1)
-    {
-        cv::cvtColor(procImage, procImage, cv::COLOR_BGR2GRAY);
-    }
 
+    int imageDim = (image.cols + image.rows)/2;
+    if (verbose) SD_TRACE1("Detected object min size : %1", imageDim*minSizeRatio);
+    if (verbose) SD_TRACE1("Detected object max size : %1", imageDim*maxSizeRatio);
 
     // Median blur
-    int medianBlurSize = 5;
+    int medianBlurSize = imageDim*minSizeRatio/4.0;
+    if (medianBlurSize % 2 == 0) medianBlurSize++;
     cv::medianBlur(procImage, procImage, medianBlurSize);
-    if (verbose) ImageCommon::displayMat(procImage, true, "Median");
+    if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
 
-//    // Enhance contours :
+    // Enhance contours :
 //    ImageProcessing::enhance(procImage, procImage);
-//    if (_verbose) ImageCommon::displayMat(procImage, true, "Enhance");
+//    if (verbose) ImageCommon::displayMat(procImage, true, "Enhance");
+
 
     // Canny
-    int t1 = 20;
-    int t2 = 150;
+    //  1 Apply Gaussian filter to smooth the image in order to remove the noise
+    //  2 Find the intensity gradients of the image
+    //  3 Apply non-maximum suppression to get rid of spurious response to edge detection
+    //  4 Apply double threshold to determine potential edges
+        // If the edge pixel’s gradient value is higher than the high threshold value, they are marked as STRONG edge pixels.
+        // If the edge pixel’s gradient value is smaller than the high threshold value and larger than the low threshold value,
+        // they are marked as WEAK edge pixels. If the pixel value is smaller than the low threshold value, they will be suppressed.
+    //  5 Track edge by hysteresis: Finalize the detection of edges by suppressing all the other edges that are weak and not connected to strong edges.
+
+    int t1 = 50; // 20
+    int t2 = 150; // 150
     cv::Canny(procImage, procImage, t1, t2);
-    if (verbose) ImageCommon::displayMat(procImage, true, "Canny");
+    if (verbose) ImageCommon::displayMat(procImage, true, QString("Canny : %1, %2").arg(t1).arg(t2));
 
     // Morpho
     cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
@@ -375,7 +459,8 @@ void detectObjects(const cv::Mat &image, QVector<std::vector<cv::Point> > *objec
 
     // Find contours
     std::vector< std::vector<cv::Point> > contours;
-    cv::findContours(procImage, contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
+    std::vector< cv::Vec4i > hierarchy;
+    cv::findContours(procImage, contours, hierarchy, cv::RETR_CCOMP, cv::CHAIN_APPROX_NONE);
     objectContours->clear();
     objectContours->resize(contours.size());
 
@@ -408,27 +493,34 @@ void detectObjects(const cv::Mat &image, QVector<std::vector<cv::Point> > *objec
 
         // REMOVE c) max dimension of contour is smaller than card radius
 
-        // d) contour brect should not touch (+/- 1 pixel) image boundaries
+        // REMOVE d) contour brect should not touch (+/- 1 pixel) image boundaries
 
-        if (a > minArea && a < maxArea &&
+        if (a > minArea && a < maxArea
 //                dx*dx + dy*dy < roiRadius*roiRadius &&
 //                maxdim < roiRadius &&
-
-                brect.x > 1 && brect.y > 1 &&
-                brect.br().x < size.width-2 &&  brect.br().y < size.height-2)
+//                brect.x > 1 && brect.y > 1 &&
+//                brect.br().x < size.width-2 &&  brect.br().y < size.height-2)
+            )
         {
+
+
+
+
             (*objectContours)[count].swap(contour);
             count++;
+
+
+
         }
-        //        }
+
     }
     objectContours->resize(count);
 
     // order by size (descending)
-    std::sort(objectContours->begin(), objectContours->end(), Compare(Compare::Greater));
+    std::sort(objectContours->begin(), objectContours->end(), Compare(Compare::Less));
 
     if (verbose) SD_TRACE(QString("Selected contours count : %1").arg(count));
-    if (verbose) ImageCommon::displayContour(objectContours->toStdVector(), image, false, true);
+    if (verbose) ImageCommon::displayContours(objectContours->toStdVector(), image, false, true);
 
 
 }
