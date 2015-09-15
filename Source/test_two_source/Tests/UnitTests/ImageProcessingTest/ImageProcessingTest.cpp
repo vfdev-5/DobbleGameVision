@@ -21,46 +21,58 @@ namespace Tests
 
 //*************************************************************************
 
-void ImageProcessingTest::detectObjectsTest()
+void ImageProcessingTest::detectObjectsTest1()
 {
 
     cv::Mat in = generateSimpleGeometries();
-    in.convertTo(in, CV_32F);
 
+    in.convertTo(in, CV_32F);
     cv::Mat noise(in.rows, in.cols, in.type());
 //    cv::randu(noise, 170, 90);
     cv::randn(noise, 100, 25);
     in = in + noise;
-
-    ImageCommon::displayMat(in, true);
-
-    // Enhance contours
-    cv::Mat t;
-    ImageProcessing::edgeStrength(in, t, 5);
-//    ImageCommon::displayMat(t, true, "edge strength");
-    in = in.mul(t);
     ImageCommon::convertTo8U(in, in);
-    ImageCommon::displayMat(in, true, "In enchanced");
 
+//    ImageCommon::displayMat(in, true);
 
+    // Detect all objects :
     ImageProcessing::Contours objects;
 
-    double minSizeRatio(0.05);
-    double maxSizeRatio(0.85);
+    double minSizeRatio(0.0);
+    double maxSizeRatio(0.95);
     ImageProcessing::DetectedObjectType type = ImageProcessing::ANY;
     cv::Mat mask = cv::Mat();
-    bool verbose = true;
 
 
     ImageProcessing::detectObjects(in, &objects,
                                    minSizeRatio, maxSizeRatio,
-                                   type, mask,
-                                   verbose);
+                                   mask, type, 0.0,
+                                   false);
+//    SD_TRACE1("Object count = %1", objects.size());
+    QVERIFY(8 == objects.size());
 
-    SD_TRACE1("Object count = %1", objects.size());
+    // Detect all ellipse-like objects:
+    type = ImageProcessing::ELLIPSE_LIKE;
+    ImageProcessing::detectObjects(in, &objects,
+                                   minSizeRatio, maxSizeRatio,
+                                   mask, type, 0.7,
+                                   false);
 
-//    QVERIFY(16 == objects.size());
+//    SD_TRACE1("Object count = %1", objects.size());
+    QVERIFY(4 == objects.size());
 
+    type = ImageProcessing::NOT_ELLIPSE_LIKE;
+    ImageProcessing::detectObjects(in, &objects,
+                                   minSizeRatio, maxSizeRatio,
+                                   mask, type, 0.7,
+                                   false);
+
+//    SD_TRACE1("Object count = %1", objects.size());
+    QVERIFY(4 == objects.size());
+
+
+
+//    // DEBUG
 //    ImageCommon::displayContours(objects.toStdVector(), in, false, true);
 
 //    ImageProcessing::Contours::iterator it = objects.begin();
@@ -71,6 +83,56 @@ void ImageProcessingTest::detectObjectsTest()
 //        ImageCommon::displayContours(testContours, in);
 //    }
 
+}
+
+//*************************************************************************
+
+void ImageProcessingTest::detectObjectsTest2()
+{
+    cv::Mat in = generateEllipseLikeGeometries();
+
+    in.convertTo(in, CV_32F);
+    cv::Mat noise(in.rows, in.cols, in.type());
+//    cv::randu(noise, 170, 90);
+    cv::randn(noise, 100, 25);
+    in = in + noise;
+    ImageCommon::convertTo8U(in, in);
+
+//    ImageCommon::displayMat(in, true);
+
+    // Detect all objects :
+    ImageProcessing::Contours objects;
+
+    double minSizeRatio(0.0);
+    double maxSizeRatio(0.95);
+    ImageProcessing::DetectedObjectType type = ImageProcessing::ANY;
+    cv::Mat mask = cv::Mat();
+
+    ImageProcessing::detectObjects(in, &objects,
+                                   minSizeRatio, maxSizeRatio,
+                                   mask, type, 0.0,
+                                   false);
+//    SD_TRACE1("Object count = %1", objects.size());
+    QVERIFY(6 == objects.size());
+
+    // Detect all ellipse-like objects:
+    type = ImageProcessing::ELLIPSE_LIKE;
+    ImageProcessing::detectObjects(in, &objects,
+                                   minSizeRatio, maxSizeRatio,
+                                   mask, type, 0.7,
+                                   false);
+
+//    SD_TRACE1("Object count = %1", objects.size());
+    QVERIFY(3 == objects.size());
+
+    type = ImageProcessing::NOT_ELLIPSE_LIKE;
+    ImageProcessing::detectObjects(in, &objects,
+                                   minSizeRatio, maxSizeRatio,
+                                   mask, type, 0.7,
+                                   false);
+
+//    SD_TRACE1("Object count = %1", objects.size());
+    QVERIFY(3 == objects.size());
 
 }
 

@@ -9,6 +9,7 @@ namespace Tests {
 //*************************************************************************
 
 cv::Mat generateSimpleGeometries();
+cv::Mat generateEllipseLikeGeometries();
 
 //*************************************************************************
 

@@ -4,6 +4,7 @@
 
 // Qt
 #include <QMap>
+#include <qmath.h>
 
 // Opencv
 #include <opencv2/core.hpp>
@@ -154,20 +155,28 @@ cv::Mat displayMat(const cv::Mat & inputImage0, bool showMinMax, const QString &
 cv::Mat displayContourBRect(const std::vector<std::vector<cv::Point> > &contours, const cv::Mat &background)
 {
     cv::Mat t, img;
-    if (background.channels() == 1)
+    if (!background.empty())
     {
-        background.copyTo(t);
-        cv::Mat m[] = {t, t, t};
-        cv::merge(m, 3, img);
-    }
-    else if (background.channels() == 3)
-    {
-        background.copyTo(img);
+        if (background.channels() == 1)
+        {
+            background.copyTo(t);
+            cv::Mat m[] = {t, t, t};
+            cv::merge(m, 3, img);
+        }
+        else if (background.channels() == 3)
+        {
+            background.copyTo(img);
+        }
+        else
+        {
+            SD_TRACE("Background image should have 1 or 3 channels");
+            return img;
+        }
     }
     else
     {
-        SD_TRACE("Background image should have 1 or 3 channels");
-        return img;
+        //        cv::Rect br = cv::boundingRect();
+        img = cv::Mat(500, 500, CV_8UC3, cv::Scalar::all(0));
     }
 
     for( size_t i = 0; i < contours.size(); i++ )
@@ -184,20 +193,28 @@ cv::Mat displayContourBRect(const std::vector<std::vector<cv::Point> > &contours
 cv::Mat displayCircles(const std::vector<cv::Vec3f> &circles, const cv::Mat &background)
 {
     cv::Mat t, img;
-    if (background.channels() == 1)
+    if (!background.empty())
     {
-        background.copyTo(t);
-        cv::Mat m[] = {t, t, t};
-        cv::merge(m, 3, img);
-    }
-    else if (background.channels() == 3)
-    {
-        background.copyTo(img);
+        if (background.channels() == 1)
+        {
+            background.copyTo(t);
+            cv::Mat m[] = {t, t, t};
+            cv::merge(m, 3, img);
+        }
+        else if (background.channels() == 3)
+        {
+            background.copyTo(img);
+        }
+        else
+        {
+            SD_TRACE("Background image should have 1 or 3 channels");
+            return img;
+        }
     }
     else
     {
-        SD_TRACE("Background image should have 1 or 3 channels");
-        return img;
+        //        cv::Rect br = cv::boundingRect();
+        img = cv::Mat(500, 500, CV_8UC3, cv::Scalar::all(0));
     }
 
     for( size_t i = 0; i < circles.size(); i++ )
@@ -295,7 +312,7 @@ cv::Mat displayContours(const std::vector<std::vector<cv::Point> > &contours, co
  * \param contour
  * \param tol
  * \return true if ratio = length(contour)/area(contour) ~ pi*(a+b)/(pi*a*b) with the tolerance, where a=brect(contour).width and b=brect(contour).height
- *  and length(contour) ~ pi*(a+b)
+ *  and length(contour) ~ pi*(a+b) or area(contour) ~ pi*a*b
  */
 bool isEllipseLike(const std::vector<cv::Point> &contour, double tol)
 {
@@ -305,7 +322,135 @@ bool isEllipseLike(const std::vector<cv::Point> &contour, double tol)
     double r = l/a;
     double r2 = 2.0*(brect.width+brect.height)/(brect.width*brect.height);
     double l2 = M_PI*(brect.width+brect.height)*0.5;
-    return (qAbs(r-r2) < tol) && (qAbs(l-l2) < 5.0*tol*l);
+    double a2 = M_PI*(brect.width*brect.height)*0.25;
+    return (qAbs(r-r2) < tol) && ((qAbs(l-l2) < 5.0*tol*l2) || (qAbs(a-a2) < 5.0*tol*a2));
+}
+
+//******************************************************************************
+
+void intersectWithRect(const std::vector<cv::Point> &rect, const std::vector<cv::Point> &contour2, std::vector<cv::Point> &output)
+{
+    for (int i=0;i<contour2.size();i++)
+    {
+        if (cv::pointPolygonTest(rect, contour2[i], false)>=0)
+        {
+            output.push_back(contour2[i]);
+        }
+    }
+}
+
+//******************************************************************************
+
+/*!
+ * \brief intersectWithEllipse
+ * \param center
+ * \param a
+ * \param b
+ * \param angle in degrees
+ * \param contour2
+ * \param output
+ *
+ * Point (x,y) is inside the ellipse (xc,yc,a,b,angle) if
+ *
+ * deltaX^2 * A^2 + deltaY^2 * B^2 + 2 * deltaX * deltaY * C < 1
+ * where
+ *  deltaX = x-xc
+ *  deltaY = y-yc
+ *  A^2 = cos^2(angle)/a^2 + sin^2(angle)/b^2
+ *  B^2 = sin^2(angle)/a^2 + cos^2(angle)/b^2
+ *  C = cos(angle) * sin(angle) * (1/a^2 - 1/b^2)
+ *
+ */
+void intersectWithEllipse(const cv::Point & center, double a, double b, double angle, const std::vector<cv::Point> &contour2, std::vector<cv::Point> &output)
+{
+    double deltaX = 0;
+    double deltaY = 0;
+    double c = qCos(M_PI * angle / 180.0);
+    double s = qSin(M_PI * angle / 180.0);
+    double A2 = c*c/(a*a) + s*s/(b*b);
+    double B2 = s*s/(a*a) + c*c/(b*b);
+    double C = c*s * (1.0/(a*a) - 1.0/(b*b));
+
+
+    for (int i=0;i<contour2.size();i++)
+    {
+        deltaX = contour2[i].x - center.x;
+        deltaY = contour2[i].y - center.y;
+        if (deltaX*deltaX*A2 + deltaY*deltaY*B2 + 2.0*deltaX*deltaY*C <= 1.0)
+        {
+            output.push_back(contour2[i]);
+        }
+    }
+}
+
+//******************************************************************************
+/*!
+ * \brief isEllipseLike2
+ * \param contour
+ * \param tol is measured between 0 and inf. The value 0 means the complete match between the contour and fitted ellipse.
+ * Large values of tol accept the defects of the contours
+ * \return true if contour 'looks' like an ellipse
+ *
+ * Idea :
+ * 1) Compute moments and obtain center and eigenvalues of principal axes
+ * 2) Intersect the  contour with a theoretical ellipse -> contour without defects
+ * 3) Compute length and area of the intersected contour
+ * 4) Compare the parameters (length, area, length/area) with the theoretical ellipse
+ *
+ */
+bool isEllipseLike2(const std::vector<cv::Point> &contour, double tol)
+{
+    cv::Moments mts = cv::moments(contour);
+
+//    SD_TRACE4("Moments : m00=%1, mu02'=%2, mu20'=%3, mu11'=%4", mts.m00, mts.mu02/mts.m00, mts.mu20/mts.m00, mts.mu11/mts.m00);
+//    SD_TRACE4("Moments : mu12=%1, mu21=%2, mu30=%3, mu03=%4", mts.mu12, mts.mu21, mts.mu03, mts.mu30);
+
+    double mu20 = mts.mu20/mts.m00, mu02 = mts.mu02/mts.m00, mu11 = mts.mu11/mts.m00;
+    double theta = 0.5*qAtan2(2.0*mu11,mu20-mu02)*180.0/M_PI;
+
+//    SD_TRACE1("Theta : %1", theta);
+    double v1, v2;
+    double x, y;
+
+    x = mts.m10/mts.m00;
+    y = mts.m01/mts.m00;
+
+    v1 = 0.5*(mu20 + mu02) + 0.5*qSqrt(4*mu11*mu11 + (mu20-mu02)*(mu20-mu02));
+    v1 = 2.03*qSqrt(v1);
+    v2 = 0.5*(mu20 + mu02) - 0.5*qSqrt(4*mu11*mu11 + (mu20-mu02)*(mu20-mu02));
+    v2 = 2.03*qSqrt(v2);
+
+//    SD_TRACE2("x,y: %1, %2", x, y);
+//    SD_TRACE2("Eigen values : %1, %2", v1, v2);
+
+    std::vector<cv::Point> intersection;
+
+    intersectWithEllipse(cv::Point(x,y), v1+0.5, v2+0.5, theta, contour, intersection);
+
+//    // DEBUG
+//    std::vector< std::vector<cv::Point> > testContours;
+//    testContours.push_back(contour);
+//    if (intersection.size() > 0)
+//        testContours.push_back(intersection);
+//    ImageCommon::displayContours(testContours, cv::Mat(), false);
+//    // DEBUG
+
+
+    double l = cv::arcLength(intersection, true);
+    double a = cv::contourArea(intersection);
+    double r = l/a;
+
+    double r2 = (v1+v2)/(v1*v2);
+    double l2 = M_PI*(v1+v2);
+    double a2 = M_PI*(v1*v2);
+
+    double ntol = (1.0 + tol*5.0)*0.01;
+    double f=2.0;
+
+//    SD_TRACE2("Params A) : qAbs(r-r2)=%1, ntol=%2, ", qAbs(r-r2), ntol);
+//    SD_TRACE4("Params B) : qAbs(l-l2)=%1, f*ntol*l2=%2, qAbs(a-a2)=%3, f*ntol*a2=%4", qAbs(l-l2), f*ntol*l2, qAbs(a-a2), f*ntol*a2);
+
+    return (qAbs(r-r2) < ntol) && ((qAbs(l-l2) < f*ntol*l2) && (qAbs(a-a2) < f*ntol*a2));
 
 }
 

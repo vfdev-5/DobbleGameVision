@@ -74,7 +74,8 @@ int main(int argc, char** argv)
     QStringList filesToOpen = QStringList() << files[1];
 #endif
 
-    double cardSizeMinRatio = 0.0;
+    // Assume that a card should be larger than 1/4 of the image size and smaller than 1.0
+    double cardSizeMinRatio = 0.25;
     double cardSizeMaxRatio = 1.0;
     DGV::CardDetector cardDetector(cardSizeMinRatio, cardSizeMaxRatio, VERBOSE);
 
@@ -106,10 +107,14 @@ int main(int argc, char** argv)
 
         QVector<std::vector<cv::Point> > cardContours;
         ImageProcessing::detectObjects(procImage, &cardContours,
-                                       0.1, 0.7,
-                                       ImageProcessing::ANY,
+                                       cardSizeMinRatio, cardSizeMaxRatio,
                                        cv::Mat(),
+                                       ImageProcessing::ELLIPSE_LIKE, 0.7,
                                        true);
+
+        // -------------------------------------------------------------------
+        // -------------------------------------------------------------------
+        // -------------------------------------------------------------------
 
         return 0;
 

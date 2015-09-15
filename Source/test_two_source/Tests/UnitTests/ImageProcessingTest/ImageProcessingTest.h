@@ -17,7 +17,8 @@ class ImageProcessingTest : public QObject
     Q_OBJECT
 private slots:
 
-    void detectObjectsTest();
+    void detectObjectsTest1();
+    void detectObjectsTest2();
 
 private:
 

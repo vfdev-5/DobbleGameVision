@@ -48,12 +48,13 @@ cv::Mat DGV_DLL_EXPORT getObjectMask(const cv::Size &size, const std::vector<cv:
 enum DetectedObjectType {
     ANY=0,
     ELLIPSE_LIKE=1,
+    NOT_ELLIPSE_LIKE=2,
 };
 
 void detectObjects(const cv::Mat & image,
                                   Contours * objectContours,
                                   double minSizeRatio=0.0, double maxSizeRatio=1.0,
-                                  DetectedObjectType type=ANY, const cv::Mat & mask=cv::Mat(),
+                                  const cv::Mat & mask=cv::Mat(), DetectedObjectType type=ANY, double param=0.0,
                                   bool verbose=false);
 
 

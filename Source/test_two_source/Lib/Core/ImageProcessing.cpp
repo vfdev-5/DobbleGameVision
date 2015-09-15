@@ -397,20 +397,20 @@ void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
  * \param objectContours output contours
  * \param minSizeRatio Minimal size ratio of detected objects, as a factor of the mean of the image dimensions
  * \param maxSizeRatio Maximal size ratio of detected objects, as a factor of the mean of the image dimensions
- * \param type Object type to detect. Possible values : ANY (any type of objects), ELLIPSE_LIKE (ellipse like objects: length/area ~ (a+b)/(a*b) and length ~ pi*(a+b) )
  * \param mask Binary mask matrix ({0,1}) indicates where to search the objects. Object should entirely be in the mask zone, otherwise it is rejected
+ * \param type Object type to detect. Possible values : ANY (any type of objects), ELLIPSE_LIKE (ellipse like objects: length/area ~ (a+b)/(a*b) and length ~ pi*(a+b) )
+ * \param param A parameter to define ellipse like tolerance for {ELLIPSE_LIKE, NOT_ELLIPSE_LIKE } type. See ImageCommon::isEllipseLike2
  * \param verbose Option to display intermediate processing result
  */
 void detectObjects(const cv::Mat &image, Contours *objectContours,
-                   double minSizeRatio, double maxSizeRatio,
-                   DetectedObjectType type, const cv::Mat &mask,
+                   double minSizeRatio, double maxSizeRatio, const cv::Mat &mask,
+                   DetectedObjectType type, double param,
                    bool verbose)
 {
     if (image.type() != CV_8U) {
         SD_TRACE("detectObjects : Input image should a 8 bits single channel matrix");
         return;
     }
-
 
     if (!objectContours)
     {
@@ -426,15 +426,21 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     if (verbose) SD_TRACE1("Detected object min size : %1", imageDim*minSizeRatio);
     if (verbose) SD_TRACE1("Detected object max size : %1", imageDim*maxSizeRatio);
 
+
+
+    // Enhance contours
+    cv::Mat t;
+    procImage.convertTo(procImage, CV_32F);
+    ImageProcessing::edgeStrength(procImage, t, 5);
+    procImage = procImage.mul(t);
+    ImageCommon::convertTo8U(procImage, procImage);
+    if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
+
+
     // Median blur
     int medianBlurSize = 5;
     cv::medianBlur(procImage, procImage, medianBlurSize);
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
-
-    // Enhance contours :
-//    ImageProcessing::enhance(procImage, procImage);
-//    if (verbose) ImageCommon::displayMat(procImage, true, "Enhance");
-
 
     // Canny
     //  1 Apply Gaussian filter to smooth the image in order to remove the noise
@@ -453,8 +459,28 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 
     // Morpho
     cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
-    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), 2);
+
+#if 1
+    // This chain is good to englobe external contours
+    cv::morphologyEx(procImage, procImage, cv::MORPH_DILATE, k1, cv::Point(1, 1), 1);
+//    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate");
+    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), 1);
+//    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate + close");
+    cv::morphologyEx(procImage, procImage, cv::MORPH_ERODE, k1, cv::Point(1, 1), 1);
+#else
+    // CLOSE seems to be useless. Main contours are far one from another
+    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), 1);
+//    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho close");
+    cv::morphologyEx(procImage, procImage, cv::MORPH_DILATE, k1, cv::Point(1, 1), 1);
+#endif
+
     if (verbose) ImageCommon::displayMat(procImage, true, "Morpho");
+
+    // Apply mask if required
+    if (!mask.empty())
+    {
+        procImage = procImage.mul(mask);
+    }
 
     // Find contours
     std::vector< std::vector<cv::Point> > contours;
@@ -478,6 +504,11 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     for (size_t i=0;i<contours.size();i++)
     {
         std::vector<cv::Point> contour = contours[i];
+        cv::Vec4i contourHierarchy = hierarchy[i];
+
+        // neglect contours with a parents
+        if (contourHierarchy[3] >= 0)
+            continue;
 
         cv::Rect brect = cv::boundingRect(contour);
         int a = brect.area();
@@ -502,16 +533,22 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
             )
         {
 
-
-
-
-            (*objectContours)[count].swap(contour);
-            count++;
-
-
-
+            if (type == ANY)
+            {
+                (*objectContours)[count].swap(contour);
+                count++;
+            }
+            else
+            {
+                bool isEllipseLike = ImageCommon::isEllipseLike2(contour, param);
+                if ((isEllipseLike && type == ELLIPSE_LIKE) ||
+                     (type == NOT_ELLIPSE_LIKE && !isEllipseLike))
+                {
+                    (*objectContours)[count].swap(contour);
+                    count++;
+                }
+            }
         }
-
     }
     objectContours->resize(count);
 
