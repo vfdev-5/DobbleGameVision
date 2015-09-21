@@ -25,6 +25,7 @@ add_subdirectory("Lib")
 add_subdirectory("App")
 add_subdirectory("Sandbox")
 add_subdirectory("Tests")
+add_subdirectory("PythonBinding")
 
 if(WIN32)
     ## install opencv library dlls :

@@ -4,6 +4,7 @@
 
 // Qt
 #include <QMap>
+#include <qmath.h>
 
 // Opencv
 #include <opencv2/core.hpp>

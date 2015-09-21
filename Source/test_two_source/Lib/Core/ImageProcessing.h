@@ -31,7 +31,9 @@ inline cv::Mat DGV_DLL_EXPORT getCircleKernel2D(int width, int height, double va
 
 void DGV_DLL_EXPORT simplify(const cv::Mat & src, cv::Mat & dst, double f);
 
+#ifdef HAS_3RDPARTY
 void DGV_DLL_EXPORT nonlinearDiffusionFiltering(const cv::Mat & input, cv::Mat & output);
+#endif
 
 void DGV_DLL_EXPORT edgeStrength(const cv::Mat & input, cv::Mat & output, int ksize=3);
 
@@ -50,7 +52,7 @@ enum DetectedObjectType {
     ELLIPSE_LIKE=1,
 };
 
-void detectObjects(const cv::Mat & image,
+void DGV_DLL_EXPORT detectObjects(const cv::Mat & image,
                                   Contours * objectContours,
                                   double minSizeRatio=0.0, double maxSizeRatio=1.0,
                                   DetectedObjectType type=ANY, const cv::Mat & mask=cv::Mat(),

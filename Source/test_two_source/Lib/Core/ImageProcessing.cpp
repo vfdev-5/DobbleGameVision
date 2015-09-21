@@ -296,6 +296,8 @@ void enhance(const cv::Mat &input, cv::Mat &output, double strength, bool laplac
     t2.convertTo(output, CV_8U);
 }
 
+
+#ifdef HAS_3RDPARTY
 //******************************************************************************************
 /*!
  * \brief nonlinearDiffusionFiltering
@@ -335,6 +337,7 @@ void nonlinearDiffusionFiltering(const cv::Mat &input, cv::Mat &output)
     evolution[evolution.size()-1].copyTo(output);
 
 }
+#endif
 
 //******************************************************************************************
 /*!
