@@ -71,11 +71,11 @@ int main(int argc, char** argv)
 #if 0
     QStringList filesToOpen = files;
 #else
-    QStringList filesToOpen = QStringList() << files[1];
+    QStringList filesToOpen = QStringList() << files[4];
 #endif
 
-    // Assume that a card should be larger than 1/4 of the image size and smaller than 1.0
-    double cardSizeMinRatio = 0.25;
+    // Assume that a card should be larger than 1/8 of the image size and smaller than 1.0
+    double cardSizeMinRatio = 0.15;
     double cardSizeMaxRatio = 1.0;
     DGV::CardDetector cardDetector(cardSizeMinRatio, cardSizeMaxRatio, VERBOSE);
 
@@ -109,7 +109,7 @@ int main(int argc, char** argv)
         ImageProcessing::detectObjects(procImage, &cardContours,
                                        cardSizeMinRatio, cardSizeMaxRatio,
                                        cv::Mat(),
-                                       ImageProcessing::ELLIPSE_LIKE, 0.7,
+                                       ImageProcessing::ELLIPSE_LIKE, 2.0,
                                        true);
 
         // -------------------------------------------------------------------

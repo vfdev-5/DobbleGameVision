@@ -6,4 +6,4 @@ file(GLOB TESTS_INC_FILES "Common.h")
 # add subdirectories :
 add_subdirectory("UnitTests/ImageCommonTest")
 add_subdirectory("UnitTests/ImageProcessingTest")
-
+add_subdirectory("UnitTests/AppTest")

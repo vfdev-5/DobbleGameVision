@@ -401,6 +401,17 @@ void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
  * \param type Object type to detect. Possible values : ANY (any type of objects), ELLIPSE_LIKE (ellipse like objects: length/area ~ (a+b)/(a*b) and length ~ pi*(a+b) )
  * \param param A parameter to define ellipse like tolerance for {ELLIPSE_LIKE, NOT_ELLIPSE_LIKE } type. See ImageCommon::isEllipseLike2
  * \param verbose Option to display intermediate processing result
+ *
+ *
+ * Idea :
+ *
+ *  1) Enhance contours -> blurred image with accentuated edges
+ *  2) Median blur -> clean up noise and weak edges
+ *  3) Canny -> detect edges
+ *  4) Morpho -> connect edges
+ *  5) Find contours
+ *  6) Select contours
+ *
  */
 void detectObjects(const cv::Mat &image, Contours *objectContours,
                    double minSizeRatio, double maxSizeRatio, const cv::Mat &mask,
@@ -427,18 +438,34 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     if (verbose) SD_TRACE1("Detected object max size : %1", imageDim*maxSizeRatio);
 
 
+    bool canSmooth = imageDim*minSizeRatio > 75;
+    SD_TRACE1("Can smooth : %1", canSmooth);
 
     // Enhance contours
     cv::Mat t;
     procImage.convertTo(procImage, CV_32F);
-    ImageProcessing::edgeStrength(procImage, t, 5);
+//    bool smooth = 0.10 * imageDim*minSizeRatio < 10;
+//    int esSize = canSmooth ? 7 : 5;
+    int esSize = 5;
+    ImageProcessing::edgeStrength(procImage, t, esSize/*smooth ? 7 : 5*/);
     procImage = procImage.mul(t);
     ImageCommon::convertTo8U(procImage, procImage);
     if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
 
 
+    // optional
+//    if (canSmooth)
+//    {
+//        int sz = 7;
+//        cv::blur(procImage, procImage, cv::Size(sz,sz));
+//        if (verbose) ImageCommon::displayMat(procImage, true, QString("Blur, ksize=%1").arg(sz));
+//    }
+
     // Median blur
-    int medianBlurSize = 5;
+    int medianBlurSize = canSmooth ? 9 : 5;
+//    int medianBlurSize = (tstSize < 5) ? 5 : (tstSize > 31) ? 31 : tstSize;
+//    if (medianBlurSize % 2 == 0) medianBlurSize++;
+
     cv::medianBlur(procImage, procImage, medianBlurSize);
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
 
@@ -464,7 +491,7 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     // This chain is good to englobe external contours
     cv::morphologyEx(procImage, procImage, cv::MORPH_DILATE, k1, cv::Point(1, 1), 1);
 //    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate");
-    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), 1);
+    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), canSmooth ? 2 : 1);
 //    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate + close");
     cv::morphologyEx(procImage, procImage, cv::MORPH_ERODE, k1, cv::Point(1, 1), 1);
 #else
@@ -532,6 +559,13 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 //                brect.br().x < size.width-2 &&  brect.br().y < size.height-2)
             )
         {
+
+            if (verbose)
+            {
+                std::vector< std::vector<cv::Point> > tstContours;
+                tstContours.push_back(contour);
+                ImageCommon::displayContours(tstContours, image, false, true);
+            }
 
             if (type == ANY)
             {

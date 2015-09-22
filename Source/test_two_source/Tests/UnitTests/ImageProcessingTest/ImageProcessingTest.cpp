@@ -138,6 +138,39 @@ void ImageProcessingTest::detectObjectsTest2()
 
 //*************************************************************************
 
+void ImageProcessingTest::detectObjectsTest3()
+{
+
+    cv::Mat in = generateBigObjects();
+
+    in.convertTo(in, CV_32F);
+    cv::Mat noise(in.rows, in.cols, in.type());
+    cv::randn(noise, 100, 25);
+    in = in + noise;
+    ImageCommon::convertTo8U(in, in);
+
+    ImageCommon::displayMat(in, true);
+
+    // Detect all objects :
+    ImageProcessing::Contours objects;
+    double minSizeRatio(0.2);
+    double maxSizeRatio(0.95);
+    ImageProcessing::DetectedObjectType type = ImageProcessing::ELLIPSE_LIKE;
+    cv::Mat mask = cv::Mat();
+
+    ImageProcessing::detectObjects(in, &objects,
+                                   minSizeRatio, maxSizeRatio,
+                                   mask, type, 0.7,
+                                   true);
+//    SD_TRACE1("Object count = %1", objects.size());
+    QVERIFY(2 == objects.size());
+
+
+
+}
+
+//*************************************************************************
+
 }
 
 QTEST_MAIN(Tests::ImageProcessingTest)

@@ -1,5 +1,5 @@
-#ifndef ImageProcessingTest_H
-#define ImageProcessingTest_H
+#ifndef AppTest_H
+#define AppTest_H
 
 // Qt
 #include <QObject>
@@ -12,21 +12,22 @@ namespace Tests
 
 //*************************************************************************
 
-class ImageProcessingTest : public QObject
+class AppTest : public QObject
 {
     Q_OBJECT
 private slots:
 
-    void detectObjectsTest1();
-    void detectObjectsTest2();
-    void detectObjectsTest3();
+    void initTestCase();
+    void detectCardsTest();
 
 private:
 
+    QStringList _filesToOpen;
+    QString _path;
 };
 
 //*************************************************************************
 
 } 
 
-#endif // ImageProcessingTest_H
+#endif // AppTest_H
