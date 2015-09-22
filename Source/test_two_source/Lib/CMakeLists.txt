@@ -11,7 +11,14 @@ include(Qt)
 
 ## search files:
     # define subfolders
-SET(modules Core 3rdparty)
+if(NOT WIN32)
+    SET(modules Core 3rdparty)
+    add_definitions("-DHAS_3RDPARTY")
+else()
+    SET(modules Core)
+endif()
+
+
 
 SET(SRC_FILES "")
 SET(INC_FILES "")

@@ -8,6 +8,9 @@
 #include <QString>
 #include <QMessageBox>
 
+// Project
+#include "LibExport.h"
+
 //******************************************************************************
 // STD OUT, STD ERR
 //******************************************************************************
@@ -37,9 +40,10 @@
 //******************************************************************************
 #define TIME_PROFILER_ON
 
+
 #ifdef TIME_PROFILER_ON
-void StartTimer(const QString & message);
-double StopTimer();
+void DGV_DLL_EXPORT StartTimer(const QString & message);
+double DGV_DLL_EXPORT StopTimer();
 #endif
 
 
