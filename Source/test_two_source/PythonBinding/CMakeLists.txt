@@ -25,16 +25,6 @@ link_libraries(optimized "DGVLib" debug "DGVLib.d")
 file(GLOB_RECURSE SRC_FILES "*.cpp")
 file(GLOB_RECURSE INC_FILES "*.h")
 
-
-#### for debug purposes: ################
-if (NOT WIN32)
-    if (CMAKE_BUILD_TYPE MATCHES Debug)
-        message("Define _DEBUG symbol")
-        add_definitions("-D_DEBUG")
-    endif (CMAKE_BUILD_TYPE MATCHES Debug)
-endif(NOT WIN32)
-##########################################
-
 ## create library :
 add_definitions("-DPYTHON_EXPORT")
 add_library( ${PROJECT_NAME} SHARED ${SRC_FILES} ${INC_FILES})
