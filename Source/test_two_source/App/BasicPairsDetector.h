@@ -17,6 +17,7 @@ class BasicPairsDetector : public PairsDetector
 {
 public:
     BasicPairsDetector(float goodDistance = 0.29, int goodMatchesMinLimit = 10, bool verbose=false);
+    virtual ~BasicPairsDetector() {}
 
     // Compare with a reference object:
     virtual bool setupRefObject(const cv::Mat & image, const cv::Mat &mask = cv::Mat());

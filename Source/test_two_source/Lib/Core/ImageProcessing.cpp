@@ -416,6 +416,9 @@ void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
  *  6) Select contours
  *
  */
+
+#define USE_RESIZE
+
 void detectObjects(const cv::Mat &image, Contours *objectContours,
                    double minSizeRatio, double maxSizeRatio, const cv::Mat &mask,
                    DetectedObjectType type, double param,
@@ -441,14 +444,24 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     if (verbose) SD_TRACE1("Detected object max size : %1", imageDim*maxSizeRatio);
 
 
-    bool canSmooth = imageDim*minSizeRatio > 75;
-    SD_TRACE1("Can smooth : %1", canSmooth);
-
+//    bool canSmooth = imageDim*minSizeRatio > 75;
+//    SD_TRACE1("Can smooth : %1", canSmooth);
 
 //    bool smooth = 0.10 * imageDim*minSizeRatio < 10;
 //    int esSize = canSmooth ? 7 : 5;
 
-#if 0
+
+    // Median blur initial
+    int objectMinSize = imageDim*minSizeRatio;
+    if (objectMinSize > 1)
+    {
+        int objectblurSize= objectMinSize/2 - 1;
+        if (objectblurSize % 2 == 0) objectblurSize++;
+        cv::medianBlur(procImage, procImage, objectblurSize);
+        if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(objectblurSize));
+    }
+
+#if 1
     // Enhance contours
     cv::Mat t;
     procImage.convertTo(procImage, CV_32F);
@@ -456,16 +469,24 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     ImageProcessing::edgeStrength(procImage, t, esSize/*smooth ? 7 : 5*/);
     if (verbose) ImageCommon::displayMat(t, true, QString("Edge strength"));
 
-
-    double minVal, maxVal;
-    cv::minMaxLoc(t, &minVal, &maxVal);
-    double thr = (maxVal - minVal)*0.45 + minVal;
-    cv::threshold(t, t, thr, 1.0, cv::THRESH_BINARY);
-    if (verbose) ImageCommon::displayMat(t, true, QString("Edge strength thresholded : %1").arg(thr));
+//    double minVal, maxVal;
+//    cv::minMaxLoc(t, &minVal, &maxVal);
+//    double thr = (maxVal - minVal)*0.75 + minVal;
+//    cv::threshold(t, t, thr, 1.0, cv::THRESH_BINARY);
+//    if (verbose) ImageCommon::displayMat(t, true, QString("Edge strength thresholded : %1").arg(thr));
 
     procImage = procImage.mul(t);
     ImageCommon::convertTo8U(procImage, procImage);
     if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
+#endif
+
+#ifdef USE_RESIZE
+    cv::Size initSize=procImage.size();
+    if (minSizeRatio > 0)
+    {
+        double f=objectMinSize*0.02;
+        cv::resize(procImage, procImage, cv::Size(), 1.0/f, 1.0/f, cv::INTER_NEAREST);
+    }
 #endif
 
 
@@ -487,10 +508,6 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
 
 
-
-    cv::Size initSize=procImage.size();
-    double f=4.0;
-    cv::resize(procImage, procImage, cv::Size(), 1.0/f, 1.0/f, cv::INTER_CUBIC);
 
 
 #if 0
@@ -531,10 +548,15 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 //    cv::watershed(in3, procImage);
 //    if (verbose) ImageCommon::displayMat(procImage, true, QString("Watershed"));
 
-    cv::resize(procImage, procImage, initSize, 0, 0, cv::INTER_CUBIC);
-    if (verbose) ImageCommon::displayMat(procImage, true, "Normal size");
 
 
+#ifdef USE_RESIZE
+    if (minSizeRatio > 0)
+    {
+        cv::resize(procImage, procImage, initSize, 0, 0, cv::INTER_NEAREST);
+        if (verbose) ImageCommon::displayMat(procImage, true, "Normal size");
+    }
+#endif
 
     // Morpho
     cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
@@ -543,7 +565,8 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     // This chain is good to englobe external contours
     cv::morphologyEx(procImage, procImage, cv::MORPH_DILATE, k1, cv::Point(1, 1), 1);
 //    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate");
-    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), canSmooth ? 2 : 1);
+//    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), canSmooth ? 2 : 1);
+    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), 1);
 //    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate + close");
     cv::morphologyEx(procImage, procImage, cv::MORPH_ERODE, k1, cv::Point(1, 1), 1);
 #else

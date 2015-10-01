@@ -200,7 +200,7 @@ void ImageProcessingTest::detectObjectsTest2()
                                    false);
 
 //    SD_TRACE1("Object count = %1", objects.size());
-    QVERIFY(3 == objects.size());
+    QVERIFY(4 == objects.size());
 
 }
 
