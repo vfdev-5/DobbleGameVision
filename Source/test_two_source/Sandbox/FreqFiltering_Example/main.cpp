@@ -98,39 +98,3 @@ int main(int argc, char** argv)
     }
 
 }
-
-
-// WRITE IMAGE:
-//{
-//    QString path = QString(argv[1]);
-//    QDir d(path);
-//    if (!d.exists())
-//    {
-//        SD_TRACE1("Provided path '%1' is not found", path);
-//        return 1;
-//    }
-
-//    cv::Mat in(450, 450, CV_8U, cv::Scalar::all(0));
-
-//    {
-
-//        cv::Mat c1(40, 40, CV_8U, cv::Scalar::all(255));
-//        cv::Mat c2(20, 40, CV_8U, cv::Scalar::all(255));
-//        cv::Mat c3(20, 20, CV_8U, cv::Scalar::all(255));
-//        cv::Mat c4(80, 80, CV_8U, cv::Scalar::all(255));
-
-//        c1.copyTo(in(cv::Rect(50, 60, 40, 40)));
-//        c2.copyTo(in(cv::Rect(100, 20, 40, 20)));
-//        c3.copyTo(in(cv::Rect(20, 100, 20, 20)));
-//        c4.copyTo(in(cv::Rect(100,100,80,80)));
-
-//        //        cv::Mat noise(in.rows, in.cols, in.type());
-//        //        cv::Mat noise2(in.rows, in.cols, in.type());
-//        //        cv::randn(noise, 150, 15);
-//        //        cv::randn(noise2, 122, 20);
-//        //        in = in - noise + noise2;
-//    }
-//    ImageCommon::displayMat(in, true, "Squares");
-//    QString f = path + "/squares.png";
-//    cv::imwrite(f.toStdString(), in);
-//}

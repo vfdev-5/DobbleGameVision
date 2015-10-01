@@ -10,8 +10,9 @@ namespace Tests {
 
 cv::Mat generateSimpleGeometries();
 cv::Mat generateEllipseLikeGeometries();
-
 cv::Mat generateBigObjects();
+
+void addNoise(cv::Mat & image);
 
 //*************************************************************************
 

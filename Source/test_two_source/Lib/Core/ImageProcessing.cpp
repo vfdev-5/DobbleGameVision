@@ -444,16 +444,29 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     bool canSmooth = imageDim*minSizeRatio > 75;
     SD_TRACE1("Can smooth : %1", canSmooth);
 
+
+//    bool smooth = 0.10 * imageDim*minSizeRatio < 10;
+//    int esSize = canSmooth ? 7 : 5;
+
+#if 0
     // Enhance contours
     cv::Mat t;
     procImage.convertTo(procImage, CV_32F);
-//    bool smooth = 0.10 * imageDim*minSizeRatio < 10;
-//    int esSize = canSmooth ? 7 : 5;
-    int esSize = 5;
+    int esSize = 3;
     ImageProcessing::edgeStrength(procImage, t, esSize/*smooth ? 7 : 5*/);
+    if (verbose) ImageCommon::displayMat(t, true, QString("Edge strength"));
+
+
+    double minVal, maxVal;
+    cv::minMaxLoc(t, &minVal, &maxVal);
+    double thr = (maxVal - minVal)*0.45 + minVal;
+    cv::threshold(t, t, thr, 1.0, cv::THRESH_BINARY);
+    if (verbose) ImageCommon::displayMat(t, true, QString("Edge strength thresholded : %1").arg(thr));
+
     procImage = procImage.mul(t);
     ImageCommon::convertTo8U(procImage, procImage);
     if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
+#endif
 
 
     // optional
@@ -465,12 +478,35 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 //    }
 
     // Median blur
-    int medianBlurSize = canSmooth ? 9 : 5;
+//    int medianBlurSize = canSmooth ? 9 : 5;
+    int medianBlurSize = 5;
 //    int medianBlurSize = (tstSize < 5) ? 5 : (tstSize > 31) ? 31 : tstSize;
 //    if (medianBlurSize % 2 == 0) medianBlurSize++;
 
     cv::medianBlur(procImage, procImage, medianBlurSize);
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
+
+
+
+    cv::Size initSize=procImage.size();
+    double f=4.0;
+    cv::resize(procImage, procImage, cv::Size(), 1.0/f, 1.0/f, cv::INTER_CUBIC);
+
+
+#if 0
+    cv::Mat m;
+    int d=15;
+    double sigmaSpace=15.0;
+    double sigmaColor=50.0;
+    cv::bilateralFilter(procImage, m, d, sigmaColor, sigmaSpace);
+    procImage = m;
+    if (verbose) ImageCommon::displayMat(procImage, true, QString("Bilateral : %1").arg(sigmaSpace));
+#endif
+
+
+    // Simplify
+//    ImageProcessing::simplify(procImage, procImage, 3.0);
+//    if (verbose) ImageCommon::displayMat(procImage, true, "Simplified");
 
     // Canny
     //  1 Apply Gaussian filter to smooth the image in order to remove the noise
@@ -485,7 +521,20 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     int t1 = 50; // 20
     int t2 = 150; // 150
     cv::Canny(procImage, procImage, t1, t2);
+
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Canny : %1, %2").arg(t1).arg(t2));
+
+//    cv::Mat in3, in3c[] = {procImage, procImage, procImage};
+//    cv::merge(in3c, 3, in3);
+//    procImage.convertTo(procImage, CV_32S, 1.0/255.0);
+
+//    cv::watershed(in3, procImage);
+//    if (verbose) ImageCommon::displayMat(procImage, true, QString("Watershed"));
+
+    cv::resize(procImage, procImage, initSize, 0, 0, cv::INTER_CUBIC);
+    if (verbose) ImageCommon::displayMat(procImage, true, "Normal size");
+
+
 
     // Morpho
     cv::Mat k1 = cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(3,3));
@@ -505,6 +554,10 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 #endif
 
     if (verbose) ImageCommon::displayMat(procImage, true, "Morpho");
+
+
+
+
 
     // Apply mask if required
     if (!mask.empty())

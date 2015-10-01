@@ -2,6 +2,9 @@
 // Opencv
 #include <opencv2/imgproc.hpp>
 
+// Project
+#include "Core/ImageCommon.h"
+
 // Tests
 #include "Common.h"
 #include "Core/Global.h"
@@ -74,7 +77,11 @@ cv::Mat generateEllipseLikeGeometries()
 
 cv::Mat generateBigObjects()
 {
-    cv::Mat out(500, 600, CV_8U, cv::Scalar::all(0));
+    cv::Mat out(500, 600, CV_8U, cv::Scalar::all(70));
+
+    // 2 big ellipses
+    cv::ellipse(out, cv::Point(430, 350), cv::Size(70, 120), -30, 0, 360, cv::Scalar::all(200), CV_FILLED);
+    cv::ellipse(out, cv::Point(200, 190), cv::Size(110, 95), 10, 0, 360, cv::Scalar::all(10), CV_FILLED);
 
     // random small objects
     int x, y;
@@ -82,19 +89,34 @@ cv::Mat generateBigObjects()
     {
         x=i*2.5 + i/2 + i/20;
         y=qrand() & 500;
-        SD_TRACE2("x=%1, y=%2", x, y);
-        cv::circle(out, cv::Point(x, y), 5 + qrand()&15, cv::Scalar::all(100), CV_FILLED);
+        cv::circle(out, cv::Point(x, y), 5 + qrand()&15, cv::Scalar::all(150), CV_FILLED);
 
-        cv::line(out, cv::Point(y,x), cv::Point(y, x+10), cv::Scalar::all(100), 3);
+        cv::line(out, cv::Point(y,x), cv::Point(y, x+10), cv::Scalar::all(250), 3);
     }
-
-
-    cv::ellipse(out, cv::Point(430, 350), cv::Size(70, 120), -30, 0, 360, cv::Scalar::all(200), CV_FILLED);
-
-    cv::ellipse(out, cv::Point(200, 190), cv::Size(110, 95), 10, 0, 360, cv::Scalar::all(200), CV_FILLED);
 
     return out;
 
+}
+
+//*************************************************************************
+
+void addNoise(cv::Mat &image)
+{
+    if (image.channels() > 1)
+    {
+        SD_TRACE("addNoise : image should have single channel");
+        return;
+    }
+    int initDepth=image.depth();
+    if (initDepth < CV_32F)
+        image.convertTo(image, CV_32F);
+
+    cv::Mat noise(image.rows, image.cols, image.type());
+    cv::randn(noise, 100, 25);
+    image = image + noise;
+
+    if (initDepth == CV_8U)
+        ImageCommon::convertTo8U(image, image);
 }
 
 //*************************************************************************
