@@ -280,9 +280,9 @@ void simplify(const cv::Mat &src, cv::Mat &dst, double f)
  */
 void enhance(const cv::Mat &input, cv::Mat &output, double strength, bool laplacianOnly)
 {
-    cv::Mat t1, t2, t3, t4;
+    cv::Mat t1, t2, t3;
     cv::Laplacian(input, t3, CV_32F, 3);
-//    ImageCommon::displayMat(t3, true, "Laplacian");
+    //    ImageCommon::displayMat(t3, true, "Laplacian");
     if (!laplacianOnly)
     {
         cv::Scharr(input, t1, CV_32F, 1, 0);
@@ -293,7 +293,8 @@ void enhance(const cv::Mat &input, cv::Mat &output, double strength, bool laplac
     input.convertTo(t2, CV_32F);
     t2 -= strength*t3;
     if (!laplacianOnly) t2 -= strength*t1;
-    t2.convertTo(output, CV_8U);
+    ImageCommon::convertTo8U(t2, output);
+//    t2.convertTo(output, CV_8U);
 }
 
 
@@ -329,10 +330,10 @@ void nonlinearDiffusionFiltering(const cv::Mat &input, cv::Mat &output)
     std::vector<cv::Mat> evolution;
     ndf.getNDEvolution(evolution);
 
-//    for (int i=0; i<evolution.size(); i++)
-//    {
-//        ImageCommon::displayMat(evolution[i], true, QString("Nonlinear filtered image : %1").arg(i));
-//    }
+    //    for (int i=0; i<evolution.size(); i++)
+    //    {
+    //        ImageCommon::displayMat(evolution[i], true, QString("Nonlinear filtered image : %1").arg(i));
+    //    }
 
     evolution[evolution.size()-1].copyTo(output);
 
@@ -344,7 +345,7 @@ void nonlinearDiffusionFiltering(const cv::Mat &input, cv::Mat &output)
  * \brief edgeStrength Basic algorithm to get enhance the edges
  * \param input single band image of any depth
  * \param ksize
- * \param output
+ * \param output image is between 0 and 255.0 of input depth
  * Algorithm :
  *  i1 = blur(input)
  *  i2 = dilate(i1)
@@ -362,11 +363,15 @@ void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
     {
         t1 = input;
     }
+
     // blur
-    cv::blur(t1, t1, cv::Size(ksize, ksize));
+    if (ksize > 1)
+        cv::blur(t1, t1, cv::Size(ksize, ksize));
 
 
     // dilate/erode
+    if (ksize == 1)
+        ksize = 3;
     cv::Mat k(ksize, ksize, CV_8U, cv::Scalar::all(1));
     cv::dilate(t1, t2, k);
     cv::erode(t1, t3, k);
@@ -375,20 +380,22 @@ void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
     t2 = t1 - t2;
     t3 = t1 - t3;
 
-    if (input.depth() < CV_32F)
-    {
-        cv::min(t2, t3, t1);
-        double minVal, maxVal;
-        cv::minMaxLoc(t1, &minVal, &maxVal);
-        double a, b;
-        a = 255.0 /(maxVal - minVal);
-        b = -255.0 * minVal / (maxVal - minVal);
+    cv::max(t2, t3, t1);
+
+
+    double minVal, maxVal;
+    cv::minMaxLoc(t1, &minVal, &maxVal);
+    double a, b;
+    a = 255.0 /(maxVal - minVal);
+    b = -255.0 * minVal / (maxVal - minVal);
+
+//    if (input.depth() < CV_32F)
+//    {
         t1.convertTo(output, input.depth(), a, b);
-    }
-    else
-    {
-        cv::min(t2, t3, output);
-    }
+//    }
+//    else
+//    {
+//    }
 
 }
 
@@ -444,14 +451,14 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     if (verbose) SD_TRACE1("Detected object max size : %1", imageDim*maxSizeRatio);
 
 
-//    bool canSmooth = imageDim*minSizeRatio > 75;
-//    SD_TRACE1("Can smooth : %1", canSmooth);
+    //    bool canSmooth = imageDim*minSizeRatio > 75;
+    //    SD_TRACE1("Can smooth : %1", canSmooth);
 
-//    bool smooth = 0.10 * imageDim*minSizeRatio < 10;
-//    int esSize = canSmooth ? 7 : 5;
+    //    bool smooth = 0.10 * imageDim*minSizeRatio < 10;
+    //    int esSize = canSmooth ? 7 : 5;
 
 
-    // Median blur initial
+    // Big initial median blur of min object size
     int objectMinSize = imageDim*minSizeRatio;
     if (objectMinSize > 1)
     {
@@ -460,25 +467,6 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
         cv::medianBlur(procImage, procImage, objectblurSize);
         if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(objectblurSize));
     }
-
-#if 1
-    // Enhance contours
-    cv::Mat t;
-    procImage.convertTo(procImage, CV_32F);
-    int esSize = 3;
-    ImageProcessing::edgeStrength(procImage, t, esSize/*smooth ? 7 : 5*/);
-    if (verbose) ImageCommon::displayMat(t, true, QString("Edge strength"));
-
-//    double minVal, maxVal;
-//    cv::minMaxLoc(t, &minVal, &maxVal);
-//    double thr = (maxVal - minVal)*0.75 + minVal;
-//    cv::threshold(t, t, thr, 1.0, cv::THRESH_BINARY);
-//    if (verbose) ImageCommon::displayMat(t, true, QString("Edge strength thresholded : %1").arg(thr));
-
-    procImage = procImage.mul(t);
-    ImageCommon::convertTo8U(procImage, procImage);
-    if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
-#endif
 
 #ifdef USE_RESIZE
     cv::Size initSize=procImage.size();
@@ -489,21 +477,77 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     }
 #endif
 
+#if 0
+    // Enhance contours
+    cv::Mat t;
+    procImage.convertTo(procImage, CV_32F);
+    int esSize = 3;
+    ImageProcessing::edgeStrength(procImage, t, esSize);
+    if (verbose) ImageCommon::displayMat(t, true, QString("Edge strength"));
+
+    //    double minVal, maxVal;
+    //    cv::minMaxLoc(t, &minVal, &maxVal);
+    //    double thr = (maxVal - minVal)*0.75 + minVal;
+    //    cv::threshold(t, t, thr, 1.0, cv::THRESH_BINARY);
+    //    if (verbose) ImageCommon::displayMat(t, true, QString("Edge strength thresholded : %1").arg(thr));
+
+    procImage = procImage - 0.25*t;
+    ImageCommon::convertTo8U(procImage, procImage);
+    if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
+#endif
+
+
+
+#if 1
+    {
+
+        procImage.convertTo(procImage, CV_32F);
+        procImage = ImageCommon::normalize(procImage, 0.01);
+
+//        if (verbose) ImageCommon::displayMat(procImage, true, "Initial");
+
+//        cv::Mat t1, t2;
+////        cv::pow(procImage, 3.0, t1);
+////        if (verbose) ImageCommon::displayMat(t1, true, "img^2");
+////        cv::pow(1.0/procImage, 3.0, t2);
+////        if (verbose) ImageCommon::displayMat(t2, true, "sqrt(img)");
+
+//        t1 = procImage;
+//        t1 = ImageCommon::normalize(t1);
+//        if (verbose) ImageCommon::displayMat(t1, true, "t1");
+
+//        t2 = 1.0/procImage;
+//        t2 = ImageCommon::normalize(t2);
+//        if (verbose) ImageCommon::displayMat(t2, true, "t2");
+
+//        if (verbose) ImageCommon::displayMat(t1 + t2, true, "t1 + t2");
+
+
+//        cv::pow(t1 + t2, 0.2, procImage);
+
+//        procImage = ImageCommon::normalize(procImage);
+
+//        procImage += t;
+        ImageCommon::convertTo8U(procImage, procImage);
+        if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
+
+    }
+#endif
+
 
     // optional
-//    if (canSmooth)
-//    {
-//        int sz = 7;
-//        cv::blur(procImage, procImage, cv::Size(sz,sz));
-//        if (verbose) ImageCommon::displayMat(procImage, true, QString("Blur, ksize=%1").arg(sz));
-//    }
+    //    if (canSmooth)
+    //    {
+    //        int sz = 7;
+    //        cv::blur(procImage, procImage, cv::Size(sz,sz));
+    //        if (verbose) ImageCommon::displayMat(procImage, true, QString("Blur, ksize=%1").arg(sz));
+    //    }
 
     // Median blur
-//    int medianBlurSize = canSmooth ? 9 : 5;
-    int medianBlurSize = 5;
-//    int medianBlurSize = (tstSize < 5) ? 5 : (tstSize > 31) ? 31 : tstSize;
-//    if (medianBlurSize % 2 == 0) medianBlurSize++;
-
+    //    int medianBlurSize = canSmooth ? 9 : 5;
+    int medianBlurSize = 3;
+    //    int medianBlurSize = (tstSize < 5) ? 5 : (tstSize > 31) ? 31 : tstSize;
+    //    if (medianBlurSize % 2 == 0) medianBlurSize++;
     cv::medianBlur(procImage, procImage, medianBlurSize);
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
 
@@ -522,17 +566,17 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 
 
     // Simplify
-//    ImageProcessing::simplify(procImage, procImage, 3.0);
-//    if (verbose) ImageCommon::displayMat(procImage, true, "Simplified");
+    //    ImageProcessing::simplify(procImage, procImage, 3.0);
+    //    if (verbose) ImageCommon::displayMat(procImage, true, "Simplified");
 
     // Canny
     //  1 Apply Gaussian filter to smooth the image in order to remove the noise
     //  2 Find the intensity gradients of the image
     //  3 Apply non-maximum suppression to get rid of spurious response to edge detection
     //  4 Apply double threshold to determine potential edges
-        // If the edge pixel’s gradient value is higher than the high threshold value, they are marked as STRONG edge pixels.
-        // If the edge pixel’s gradient value is smaller than the high threshold value and larger than the low threshold value,
-        // they are marked as WEAK edge pixels. If the pixel value is smaller than the low threshold value, they will be suppressed.
+    // If the edge pixel’s gradient value is higher than the high threshold value, they are marked as STRONG edge pixels.
+    // If the edge pixel’s gradient value is smaller than the high threshold value and larger than the low threshold value,
+    // they are marked as WEAK edge pixels. If the pixel value is smaller than the low threshold value, they will be suppressed.
     //  5 Track edge by hysteresis: Finalize the detection of edges by suppressing all the other edges that are weak and not connected to strong edges.
 
     int t1 = 50; // 20
@@ -541,12 +585,12 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Canny : %1, %2").arg(t1).arg(t2));
 
-//    cv::Mat in3, in3c[] = {procImage, procImage, procImage};
-//    cv::merge(in3c, 3, in3);
-//    procImage.convertTo(procImage, CV_32S, 1.0/255.0);
+    //    cv::Mat in3, in3c[] = {procImage, procImage, procImage};
+    //    cv::merge(in3c, 3, in3);
+    //    procImage.convertTo(procImage, CV_32S, 1.0/255.0);
 
-//    cv::watershed(in3, procImage);
-//    if (verbose) ImageCommon::displayMat(procImage, true, QString("Watershed"));
+    //    cv::watershed(in3, procImage);
+    //    if (verbose) ImageCommon::displayMat(procImage, true, QString("Watershed"));
 
 
 
@@ -564,15 +608,15 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 #if 1
     // This chain is good to englobe external contours
     cv::morphologyEx(procImage, procImage, cv::MORPH_DILATE, k1, cv::Point(1, 1), 1);
-//    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate");
-//    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), canSmooth ? 2 : 1);
+    //    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate");
+    //    cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), canSmooth ? 2 : 1);
     cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), 1);
-//    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate + close");
+    //    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho dilate + close");
     cv::morphologyEx(procImage, procImage, cv::MORPH_ERODE, k1, cv::Point(1, 1), 1);
 #else
     // CLOSE seems to be useless. Main contours are far one from another
     cv::morphologyEx(procImage, procImage, cv::MORPH_CLOSE, k1, cv::Point(1, 1), 1);
-//    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho close");
+    //    if (verbose) ImageCommon::displayMat(procImage, true, "Morpho close");
     cv::morphologyEx(procImage, procImage, cv::MORPH_DILATE, k1, cv::Point(1, 1), 1);
 #endif
 
@@ -601,8 +645,8 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     int maxArea = maxSizeRatio*maxSizeRatio*totalArea;
     int minArea = minSizeRatio*minSizeRatio*totalArea;
 
-//    int roiRadius = 0.45 * size.width;
-//    if (verbose) SD_TRACE(QString("Roi radius : %1").arg(roiRadius));
+    //    int roiRadius = 0.45 * size.width;
+    //    if (verbose) SD_TRACE(QString("Roi radius : %1").arg(roiRadius));
     //    int maxLength = 0.95*size.width * M_PI;
     if (verbose) SD_TRACE(QString("Contours count : %1").arg(contours.size()));
 
@@ -618,9 +662,9 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 
         cv::Rect brect = cv::boundingRect(contour);
         int a = brect.area();
-//        int dx = brect.tl().x + brect.width/2 - size.width/2;
-//        int dy = brect.tl().y + brect.height/2 - size.height/2;
-//        int maxdim = qMax(brect.width, brect.height);
+        //        int dx = brect.tl().x + brect.width/2 - size.width/2;
+        //        int dy = brect.tl().y + brect.height/2 - size.height/2;
+        //        int maxdim = qMax(brect.width, brect.height);
 
         // Select contour such that :
         // a) bounding rect of the contour larger min area and smaller than max area
@@ -632,11 +676,11 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
         // REMOVE d) contour brect should not touch (+/- 1 pixel) image boundaries
 
         if (a > minArea && a < maxArea
-//                dx*dx + dy*dy < roiRadius*roiRadius &&
-//                maxdim < roiRadius &&
-//                brect.x > 1 && brect.y > 1 &&
-//                brect.br().x < size.width-2 &&  brect.br().y < size.height-2)
-            )
+                //                dx*dx + dy*dy < roiRadius*roiRadius &&
+                //                maxdim < roiRadius &&
+                //                brect.x > 1 && brect.y > 1 &&
+                //                brect.br().x < size.width-2 &&  brect.br().y < size.height-2)
+                )
         {
 
             if (verbose)
@@ -655,7 +699,7 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
             {
                 bool isEllipseLike = ImageCommon::isEllipseLike2(contour, param);
                 if ((isEllipseLike && type == ELLIPSE_LIKE) ||
-                     (type == NOT_ELLIPSE_LIKE && !isEllipseLike))
+                        (type == NOT_ELLIPSE_LIKE && !isEllipseLike))
                 {
                     (*objectContours)[count].swap(contour);
                     count++;

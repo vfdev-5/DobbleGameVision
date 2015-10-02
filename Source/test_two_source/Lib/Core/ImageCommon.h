@@ -38,6 +38,9 @@ void DGV_DLL_EXPORT intersectWithEllipse(const cv::Point & center, double a, dou
 
 void DGV_DLL_EXPORT convertTo8U(const cv::Mat & input, cv::Mat & output);
 
+cv::Mat DGV_DLL_EXPORT normalize(const cv::Mat & inputF, double minVal = 0.0, double maxVal = 1.0);
+
+
 //******************************************************************************************
 
 void DGV_DLL_EXPORT printMat(const cv::Mat & inputImage, const QString &windowName=QString(), int limit=10);

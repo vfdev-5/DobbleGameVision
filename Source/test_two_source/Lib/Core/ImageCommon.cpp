@@ -553,5 +553,22 @@ void convertTo8U(const cv::Mat &input, cv::Mat &output)
 }
 
 //******************************************************************************
+/*!
+ * \brief normalize method to normalize single channel image (with depth >= 32F) between minVal and maxVal
+ * \param inputF
+ * \return
+ */
+cv::Mat normalize(const cv::Mat &inputF, double minVal, double maxVal)
+{
+    if (inputF.channels() > 1 || inputF.depth() < CV_32F)
+        return cv::Mat();
+
+    double oldMinVal, oldMaxVal;
+    cv::minMaxLoc(inputF, &oldMinVal, &oldMaxVal);
+
+    return (maxVal-minVal) * (inputF - oldMinVal)/(oldMaxVal - oldMinVal) + minVal;
+}
+
+//******************************************************************************
 \
 }
