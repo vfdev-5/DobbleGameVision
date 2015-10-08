@@ -8,6 +8,11 @@
 // Opencv
 #include <opencv2/imgproc.hpp>
 
+// cvplot
+#ifdef HAS_CVPLOT2
+#include "cvplot.h"
+#endif
+
 // Project
 #include "Global.h"
 #include "ImageCommon.h"
@@ -415,12 +420,17 @@ void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
  *
  * Idea :
  *
- *  1) Enhance contours -> blurred image with accentuated edges
- *  2) Median blur -> clean up noise and weak edges
- *  3) Canny -> detect edges
- *  4) Morpho -> connect edges
- *  5) Find contours
- *  6) Select contours
+ *  1) Remove small image details smaller than minimum size
+ *      - Median blur of size prop to min size
+ *      - Resize of factor prop to min size
+ *      - Enhance edges
+ *  2) Detect contours
+ *      - Small Median blur
+ *      - Canny
+ *      - Morpho
+ *      - Find contours
+ *  3) Select contours
+ *      - Apply selection criteria
  *
  */
 
@@ -451,12 +461,7 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     if (verbose) SD_TRACE1("Detected object max size : %1", imageDim*maxSizeRatio);
 
 
-    //    bool canSmooth = imageDim*minSizeRatio > 75;
-    //    SD_TRACE1("Can smooth : %1", canSmooth);
-
-    //    bool smooth = 0.10 * imageDim*minSizeRatio < 10;
-    //    int esSize = canSmooth ? 7 : 5;
-
+    // ***** Remove small image details smaller than minimum size *****
 
     // Big initial median blur of min object size
     int objectMinSize = imageDim*minSizeRatio;
@@ -497,63 +502,6 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 #endif
 
 
-
-#if 1
-    {
-
-        procImage.convertTo(procImage, CV_32F);
-        procImage = ImageCommon::normalize(procImage, 0.01);
-
-//        if (verbose) ImageCommon::displayMat(procImage, true, "Initial");
-
-//        cv::Mat t1, t2;
-////        cv::pow(procImage, 3.0, t1);
-////        if (verbose) ImageCommon::displayMat(t1, true, "img^2");
-////        cv::pow(1.0/procImage, 3.0, t2);
-////        if (verbose) ImageCommon::displayMat(t2, true, "sqrt(img)");
-
-//        t1 = procImage;
-//        t1 = ImageCommon::normalize(t1);
-//        if (verbose) ImageCommon::displayMat(t1, true, "t1");
-
-//        t2 = 1.0/procImage;
-//        t2 = ImageCommon::normalize(t2);
-//        if (verbose) ImageCommon::displayMat(t2, true, "t2");
-
-//        if (verbose) ImageCommon::displayMat(t1 + t2, true, "t1 + t2");
-
-
-//        cv::pow(t1 + t2, 0.2, procImage);
-
-//        procImage = ImageCommon::normalize(procImage);
-
-//        procImage += t;
-        ImageCommon::convertTo8U(procImage, procImage);
-        if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
-
-    }
-#endif
-
-
-    // optional
-    //    if (canSmooth)
-    //    {
-    //        int sz = 7;
-    //        cv::blur(procImage, procImage, cv::Size(sz,sz));
-    //        if (verbose) ImageCommon::displayMat(procImage, true, QString("Blur, ksize=%1").arg(sz));
-    //    }
-
-    // Median blur
-    //    int medianBlurSize = canSmooth ? 9 : 5;
-    int medianBlurSize = 3;
-    //    int medianBlurSize = (tstSize < 5) ? 5 : (tstSize > 31) ? 31 : tstSize;
-    //    if (medianBlurSize % 2 == 0) medianBlurSize++;
-    cv::medianBlur(procImage, procImage, medianBlurSize);
-    if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
-
-
-
-
 #if 0
     cv::Mat m;
     int d=15;
@@ -565,9 +513,82 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 #endif
 
 
-    // Simplify
-    //    ImageProcessing::simplify(procImage, procImage, 3.0);
-    //    if (verbose) ImageCommon::displayMat(procImage, true, "Simplified");
+
+#if 1
+    {
+
+        procImage.convertTo(procImage, CV_32F);
+//        procImage = ImageCommon::normalize(procImage, 0.001);
+
+
+#ifdef HAS_CVPLOT2
+        if (verbose)
+        {
+            for (int x=10; x< procImage.cols; x+=200)
+            {
+                //            int y=90;
+                //            int x=95;
+                //            cv::Mat cut1 = procImage(cv::Rect(0, y, procImage.cols, 1));
+                cv::Mat cut2 = procImage(cv::Rect(x, 0, 1, procImage.rows));
+                //            CvPlot::plot("Initial cut 1", cut1);
+                CvPlot::plot("Initial cut 2", cut2, 0, rand() % 255, rand() % 255, rand() % 255);
+
+                //            cv::line(procImage, cv::Point(0, y), cv::Point(procImage.cols, y), cv::Scalar(255));
+                cv::line(procImage, cv::Point(x, 0), cv::Point(x, procImage.rows), cv::Scalar(255));
+
+            }
+        }
+#endif
+
+        if (verbose) ImageCommon::displayMat(procImage, true, "Initial");
+        cv::Mat t1, t2;
+
+//        return;
+
+        cv::pow(procImage, 0.5, t1);
+        if (verbose) ImageCommon::displayMat(t1, true, "Power High values");
+        cv::Laplacian(t1, t1, t1.depth(), 5);
+        t1 = ImageCommon::normalize(t1);
+        if (verbose) ImageCommon::displayMat(t1, true, "Power High values Edges");
+
+        cv::pow(1.0/procImage, 0.5, t2);
+        if (verbose) ImageCommon::displayMat(t2, true, "Power Low values");
+        cv::Laplacian(t2, t2, t2.depth(), 5);
+        t2 = ImageCommon::normalize(t2);
+        if (verbose) ImageCommon::displayMat(t2, true, "Power Low values Edges");
+
+
+        t1 = t1 + t2;
+
+//        t1 = procImage;
+//        t1 = ImageCommon::normalize(t1);
+//        if (verbose) ImageCommon::displayMat(t1, true, "t1");
+//        t2 = 1.0/procImage;
+//        t2 = ImageCommon::normalize(t2);
+//        if (verbose) ImageCommon::displayMat(t2, true, "t2");
+//        if (verbose) ImageCommon::displayMat(t1 + t2, true, "t1 + t2");
+//        cv::pow(t1 + t2, 0.5, procImage);
+
+
+        cv::Laplacian(t1, t2, t1.depth(), 5);
+        if (verbose) ImageCommon::displayMat(t2, true, "Edges");
+
+
+
+        procImage = ImageCommon::normalize(procImage);
+        ImageCommon::convertTo8U(procImage, procImage);
+        if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
+
+    }
+#endif
+
+
+    // ***** Detect contours *****
+
+    // Median blur
+    int medianBlurSize = 3;
+    cv::medianBlur(procImage, procImage, medianBlurSize);
+    if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
 
     // Canny
     //  1 Apply Gaussian filter to smooth the image in order to remove the noise
@@ -584,6 +605,8 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     cv::Canny(procImage, procImage, t1, t2);
 
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Canny : %1, %2").arg(t1).arg(t2));
+
+
 
     //    cv::Mat in3, in3c[] = {procImage, procImage, procImage};
     //    cv::merge(in3c, 3, in3);
@@ -625,12 +648,18 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 
 
 
+    // RETURN TO REMOVE
+//    return;
+    // RETURN TO REMOVE
+
+
 
     // Apply mask if required
     if (!mask.empty())
     {
         procImage = procImage.mul(mask);
     }
+
 
     // Find contours
     std::vector< std::vector<cv::Point> > contours;
@@ -639,6 +668,8 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     objectContours->clear();
     objectContours->resize(contours.size());
 
+
+    // ***** Select contours *****
 
     // Define constraints:
     int totalArea = size.width * size.height;

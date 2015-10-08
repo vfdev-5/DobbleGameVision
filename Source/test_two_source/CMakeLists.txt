@@ -20,6 +20,10 @@ find_package( OpenCV 3.0.0 REQUIRED)
 set( QT_COMPONENT_LIST Widgets Test)
 find_package( Qt REQUIRED )
 
+# Find cvplot2
+find_package(CvPlot2)
+
+
 # add library :
 add_subdirectory("Lib")
 add_subdirectory("App")

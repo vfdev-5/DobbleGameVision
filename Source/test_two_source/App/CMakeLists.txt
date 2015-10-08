@@ -9,6 +9,11 @@ link_libraries(${OpenCV_LIBS})
 SET(INSTALL_QT_DLLS ON)
 include(Qt)
 
+## include & link to cvplot2
+#if (CVPLOT2_FOUND)
+#    include(CvPlot2)
+#endif()
+
 ## include & link to project library
 include_directories(${CMAKE_SOURCE_DIR}/Lib)
 include_directories(${CMAKE_BINARY_DIR}/Lib)

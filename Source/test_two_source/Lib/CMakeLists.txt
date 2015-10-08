@@ -9,6 +9,14 @@ link_libraries(${OpenCV_LIBS})
 SET(INSTALL_QT_DLLS OFF)
 include(Qt)
 
+
+## include & link to cvplot2
+if (CVPLOT2_FOUND)
+    include(CvPlot2)
+    add_definitions("-DHAS_CVPLOT2")
+endif()
+
+
 ## search files:
     # define subfolders
 if(NOT WIN32)
