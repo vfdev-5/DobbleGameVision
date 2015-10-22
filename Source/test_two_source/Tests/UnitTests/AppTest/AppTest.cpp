@@ -51,7 +51,7 @@ void AppTest::detectCardsTest()
 {
 
     // Assume that a card should be larger than 1/8 of the image size and smaller than 1.0
-    double cardSizeMinRatio = 0.2;
+    double cardSizeMinRatio = 0.15;
     double cardSizeMaxRatio = 1.0;
 
     // Loop on files :
@@ -87,71 +87,24 @@ void AppTest::detectCardsTest()
                                        cv::Mat(),
                                        ImageProcessing::ELLIPSE_LIKE, 1.5,
                                        true);
-
-        SD_TRACE1("Object count = %1", cardContours.size());
+//        SD_TRACE1("Object count = %1", cardContours.size());
 //        QVERIFY();
 
+        // ----- test
+//        cv::Mat img2F;
+//        procImage.convertTo(img2F, CV_32F);
+//        cv::dft(img2F, img2F, cv::DFT_COMPLEX_OUTPUT | cv::DFT_SCALE);
+//        img2F = ImageProcessing::fftShift(img2F);
+//        ImageCommon::displayMat(img2F, true, "2d fft");
+
+//        int sx = 0.15*procImage.cols;
+//        int sy = 0.15*procImage.rows;
+//        cv::Mat freqMask = ImageProcessing::getCutGaussianKernel2D(sx, sy, 0.0, 0.0, 0.3);
+//        ImageCommon::displayMat(freqMask, true, "freqMask");
+//        ImageProcessing::freqFilter(procImage, procImage, freqMask, true, true);
+//        ImageCommon::displayMat(procImage, true, "fft filteres");
+
     }
-
-
-//    cv::Mat in = generateSimpleGeometries();
-
-//    in.convertTo(in, CV_32F);
-//    cv::Mat noise(in.rows, in.cols, in.type());
-////    cv::randu(noise, 170, 90);
-//    cv::randn(noise, 100, 25);
-//    in = in + noise;
-//    ImageCommon::convertTo8U(in, in);
-
-////    ImageCommon::displayMat(in, true);
-
-//    // Detect all objects :
-//    ImageProcessing::Contours objects;
-
-//    double minSizeRatio(0.0);
-//    double maxSizeRatio(0.95);
-//    ImageProcessing::DetectedObjectType type = ImageProcessing::ANY;
-//    cv::Mat mask = cv::Mat();
-
-
-//    ImageProcessing::detectObjects(in, &objects,
-//                                   minSizeRatio, maxSizeRatio,
-//                                   mask, type, 0.0,
-//                                   false);
-////    SD_TRACE1("Object count = %1", objects.size());
-//    QVERIFY(8 == objects.size());
-
-//    // Detect all ellipse-like objects:
-//    type = ImageProcessing::ELLIPSE_LIKE;
-//    ImageProcessing::detectObjects(in, &objects,
-//                                   minSizeRatio, maxSizeRatio,
-//                                   mask, type, 0.7,
-//                                   false);
-
-////    SD_TRACE1("Object count = %1", objects.size());
-//    QVERIFY(4 == objects.size());
-
-//    type = ImageProcessing::NOT_ELLIPSE_LIKE;
-//    ImageProcessing::detectObjects(in, &objects,
-//                                   minSizeRatio, maxSizeRatio,
-//                                   mask, type, 0.7,
-//                                   false);
-
-////    SD_TRACE1("Object count = %1", objects.size());
-//    QVERIFY(4 == objects.size());
-
-
-
-//    // DEBUG
-//    ImageCommon::displayContours(objects.toStdVector(), in, false, true);
-
-//    ImageProcessing::Contours::iterator it = objects.begin();
-//    for (int i=0;it!=objects.end();++it, i++)
-//    {
-//        std::vector< std::vector<cv::Point> > testContours;
-//        testContours.push_back(*it);
-//        ImageCommon::displayContours(testContours, in);
-//    }
 
 }
 

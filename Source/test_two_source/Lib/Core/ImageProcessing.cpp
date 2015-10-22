@@ -48,12 +48,12 @@ protected:
 //******************************************************************************************
 /*!
  * \brief freqFilter
- * \param input
+ * \param input image (1 or 2 channels)
  * \param output
- * \param freqMask should zero-one binary mask
+ * \param freqMask should zero-one binary mask of type CV_32F
  * \param inside
  */
-void freqFilter(const cv::Mat &input, cv::Mat &output, const cv::Mat &freqMask, bool inside)
+void freqFilter(const cv::Mat &input, cv::Mat &output, const cv::Mat &freqMask, bool inside, bool verbose)
 {
     if (freqMask.type() != CV_32F)
     {
@@ -71,7 +71,7 @@ void freqFilter(const cv::Mat &input, cv::Mat &output, const cv::Mat &freqMask, 
     cv::dft(img2F, img2F, cv::DFT_COMPLEX_OUTPUT | cv::DFT_SCALE);
 
     img2F = fftShift(img2F);
-    // ImageCommon::displayMat(img2F, true, "2d fft");
+    if (verbose) ImageCommon::displayMat(img2F, true, "2d fft");
 
     int w = img2F.cols;
     int h = img2F.rows;
@@ -98,7 +98,7 @@ void freqFilter(const cv::Mat &input, cv::Mat &output, const cv::Mat &freqMask, 
         t.copyTo(img2F2(r));
     }
 
-    //    ImageCommon::displayMat(img2F2, true, "2d fft");
+    if (verbose) ImageCommon::displayMat(img2F2, true, "2d fft");
 
     img2F2 = fftShift(img2F2);
     cv::idft(img2F2,img2F2);
@@ -141,7 +141,12 @@ cv::Mat fftShift(const cv::Mat &input)
 }
 
 //******************************************************************************************
-
+/*!
+ * \brief getGaussianKernel2D generates a gaussian mask of type CV_32F
+ * \param size
+ * \param sigmaX, sigmaY
+ * \return mask with values between 0.0 and 1.0
+ */
 cv::Mat getGaussianKernel2D(const cv::Size &size, double sigmaX, double sigmaY)
 {
     cv::Mat out(size.height, size.width, CV_32F, cv::Scalar::all(0.0));
@@ -165,6 +170,24 @@ cv::Mat getGaussianKernel2D(const cv::Size &size, double sigmaX, double sigmaY)
     return out;
 
 }
+
+//******************************************************************************************
+/*!
+ * \brief getCutGaussianKernel2D generates a cut gaussian mask of type CV_32F. A profile looks like smoothed windows
+ * \param size
+ * \param sigmaX
+ * \param sigmaY
+ * \param cut between [0.0, 1.0]. The value 0.0 corresponds to fully zero mask and 1.0 corresponds to a gaussian kernel mask without any cut
+ * \return mask with values between 0.0 and 1.0
+ */
+cv::Mat getCutGaussianKernel2D(const cv::Size &size, double sigmaX, double sigmaY, double cut)
+{
+    cv::Mat out = getGaussianKernel2D(size, sigmaX, sigmaY);
+    cv::threshold(out, out, cut, 1.0, CV_THRESH_TRUNC);
+    out /= cut;
+    return out;
+}
+
 
 //******************************************************************************************
 /*!
@@ -425,7 +448,6 @@ void edgeStrength(const cv::Mat &input, cv::Mat &output, int ksize)
  *      - Resize of factor prop to min size
  *      - Enhance edges
  *  2) Detect contours
- *      - Small Median blur
  *      - Canny
  *      - Morpho
  *      - Find contours
@@ -465,17 +487,62 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 
     // Big initial median blur of min object size
     int objectMinSize = imageDim*minSizeRatio;
-    if (objectMinSize > 1)
+    bool useResize=false;
+
+#if 0
+    if (objectMinSize > 50)
     {
-        int objectblurSize= objectMinSize/2 - 1;
+        int objectblurSize = objectMinSize/3 - 1;
         if (objectblurSize % 2 == 0) objectblurSize++;
         cv::medianBlur(procImage, procImage, objectblurSize);
         if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(objectblurSize));
+        useResize=true;
     }
+    else
+    {
+        // Median blur
+        int medianBlurSize = 5;
+        cv::medianBlur(procImage, procImage, medianBlurSize);
+        if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
+    }
+#endif
+
+
+#if 1
+
+    // Median blur
+    int medianBlurSize = 5;
+    cv::medianBlur(procImage, procImage, medianBlurSize);
+    if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
+
+    if (objectMinSize > 0)
+    {
+        // Hypothesis on frequency/object-size dependency
+        // unit pulse (pulse duration = tau on total time T)-> cardinal sinus : sinc(pi*tau*f)
+        // low-pass filter with fcut = 1.0/tau
+        // fcut_index = fcut / df, df = 1.0/T
+        //
+        // T = image.size, tau = minObjectSize
+        // fcut_index = image.size * (1/minObjectSize)
+        int sx = (10.0/objectMinSize)*procImage.cols;
+        int sy = (10.0/objectMinSize)*procImage.rows;
+        SD_TRACE2("FFT filter size : %1, %2", sx, sy);
+        cv::Mat freqMask = ImageProcessing::getCutGaussianKernel2D(sx, sy, 0.0, 0.0, 0.25);
+        ImageProcessing::freqFilter(procImage, procImage, freqMask, true);
+        if (verbose) ImageCommon::displayMat(procImage, true, QString("fft filtered"));
+    }
+
+
+#endif
+
+
+
+
+
 
 #ifdef USE_RESIZE
     cv::Size initSize=procImage.size();
-    if (minSizeRatio > 0)
+    if (useResize)
     {
         double f=objectMinSize*0.02;
         cv::resize(procImage, procImage, cv::Size(), 1.0/f, 1.0/f, cv::INTER_NEAREST);
@@ -518,47 +585,51 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     {
 
         procImage.convertTo(procImage, CV_32F);
-//        procImage = ImageCommon::normalize(procImage, 0.001);
+        procImage = ImageCommon::normalize(procImage, 0.001);
 
-
-#ifdef HAS_CVPLOT2
-        if (verbose)
-        {
-            for (int x=10; x< procImage.cols; x+=200)
-            {
-                //            int y=90;
-                //            int x=95;
-                //            cv::Mat cut1 = procImage(cv::Rect(0, y, procImage.cols, 1));
-                cv::Mat cut2 = procImage(cv::Rect(x, 0, 1, procImage.rows));
-                //            CvPlot::plot("Initial cut 1", cut1);
-                CvPlot::plot("Initial cut 2", cut2, 0, rand() % 255, rand() % 255, rand() % 255);
-
-                //            cv::line(procImage, cv::Point(0, y), cv::Point(procImage.cols, y), cv::Scalar(255));
-                cv::line(procImage, cv::Point(x, 0), cv::Point(x, procImage.rows), cv::Scalar(255));
-
-            }
-        }
-#endif
 
         if (verbose) ImageCommon::displayMat(procImage, true, "Initial");
-        cv::Mat t1, t2;
 
-//        return;
+#ifdef HAS_CVPLOT2
+//        if (verbose)
+//        {
+//            cv::Mat m;
+//            procImage.copyTo(m);
+//            for (int d=80; d<procImage.cols && d<procImage.rows; d+=110)
+//            {
+//                cv::Mat cut1 = procImage.row(d);
+//                cv::Mat cut2 = procImage.col(d);
+//                CvPlot::plot("Initial cut 1", cut1);
+//                CvPlot::plot("Initial cut 2", cut2);
+//                cv::line(m, cv::Point(d, 0), cv::Point(d, procImage.rows), cv::Scalar(1.0));
+//                cv::line(m, cv::Point(0, d), cv::Point(procImage.cols, d), cv::Scalar(1.0));
+//            }
+//            if (verbose) ImageCommon::displayMat(m, true, "Initial out");
+//        }
+#endif
 
-        cv::pow(procImage, 0.5, t1);
-        if (verbose) ImageCommon::displayMat(t1, true, "Power High values");
-        cv::Laplacian(t1, t1, t1.depth(), 5);
-        t1 = ImageCommon::normalize(t1);
-        if (verbose) ImageCommon::displayMat(t1, true, "Power High values Edges");
+        double v = 0.20;
+        cv::threshold(procImage, procImage, 1.0 - v, 1.0, CV_THRESH_TRUNC);
+        cv::threshold(procImage, procImage, v, 0.0, CV_THRESH_TOZERO);
 
-        cv::pow(1.0/procImage, 0.5, t2);
-        if (verbose) ImageCommon::displayMat(t2, true, "Power Low values");
-        cv::Laplacian(t2, t2, t2.depth(), 5);
-        t2 = ImageCommon::normalize(t2);
-        if (verbose) ImageCommon::displayMat(t2, true, "Power Low values Edges");
+//        cv::Mat t1, t2;
+//        cv::threshold(procImage, t1, 0.75, 1.0, CV_THRESH_TRUNC);
+//        cv::pow(procImage, 0.33, t1);
+//        if (verbose) ImageCommon::displayMat(t1, true, "Power High values");
+//        cv::Laplacian(t1, t1, t1.depth(), 5);
+//        t1 = ImageCommon::normalize(t1, 0.001);
+//        if (verbose) ImageCommon::displayMat(t1, true, "Power High values Edges");
+
+//        cv::pow(procImage, 3.0, t2);
+//        cv::threshold(procImage, t2, 0.25, 0.0, CV_THRESH_TOZERO);
+//        if (verbose) ImageCommon::displayMat(t2, true, "Power Low values");
+//        cv::Laplacian(t2, t2, t2.depth(), 5);
+//        t2 = ImageCommon::normalize(t2, 0.001);
+//        if (verbose) ImageCommon::displayMat(t2, true, "Power Low values Edges");
 
 
-        t1 = t1 + t2;
+//        t1 = t1 + t2;
+//        procImage= 0.5*t1 + 0.5*t2;
 
 //        t1 = procImage;
 //        t1 = ImageCommon::normalize(t1);
@@ -568,15 +639,31 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 //        if (verbose) ImageCommon::displayMat(t2, true, "t2");
 //        if (verbose) ImageCommon::displayMat(t1 + t2, true, "t1 + t2");
 //        cv::pow(t1 + t2, 0.5, procImage);
+//        cv::Laplacian(t1, t2, t1.depth(), 5);
+//        if (verbose) ImageCommon::displayMat(t2, true, "Edges");
 
 
-        cv::Laplacian(t1, t2, t1.depth(), 5);
-        if (verbose) ImageCommon::displayMat(t2, true, "Edges");
-
-
-
-        procImage = ImageCommon::normalize(procImage);
+        procImage = ImageCommon::normalize(procImage, 0.001);
         ImageCommon::convertTo8U(procImage, procImage);
+
+#ifdef HAS_CVPLOT2
+//        if (verbose)
+//        {
+//            cv::Mat m;
+//            procImage.copyTo(m);
+//            for (int d=80; d<procImage.cols && d<procImage.rows; d+=110)
+//            {
+//                cv::Mat cut1 = procImage.row(d);
+//                cv::Mat cut2 = procImage.col(d);
+//                CvPlot::plot("Enchanced cut 1", cut1);
+//                CvPlot::plot("Enchanced cut 2", cut2);
+//                cv::line(m, cv::Point(d, 0), cv::Point(d, procImage.rows), cv::Scalar(255.0));
+//                cv::line(m, cv::Point(0, d), cv::Point(procImage.cols, d), cv::Scalar(255.0));
+//            }
+//            if (verbose) ImageCommon::displayMat(m, true, "Initial out");
+//        }
+#endif
+
         if (verbose) ImageCommon::displayMat(procImage, true, "Enchanced");
 
     }
@@ -584,11 +671,6 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 
 
     // ***** Detect contours *****
-
-    // Median blur
-    int medianBlurSize = 3;
-    cv::medianBlur(procImage, procImage, medianBlurSize);
-    if (verbose) ImageCommon::displayMat(procImage, true, QString("Median blur, ksize=%1").arg(medianBlurSize));
 
     // Canny
     //  1 Apply Gaussian filter to smooth the image in order to remove the noise
@@ -600,8 +682,8 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
     // they are marked as WEAK edge pixels. If the pixel value is smaller than the low threshold value, they will be suppressed.
     //  5 Track edge by hysteresis: Finalize the detection of edges by suppressing all the other edges that are weak and not connected to strong edges.
 
-    int t1 = 50; // 20
-    int t2 = 150; // 150
+    int t1 = 70; // 50; // 20
+    int t2 = 200; // 150; // 150
     cv::Canny(procImage, procImage, t1, t2);
 
     if (verbose) ImageCommon::displayMat(procImage, true, QString("Canny : %1, %2").arg(t1).arg(t2));
@@ -618,7 +700,7 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 
 
 #ifdef USE_RESIZE
-    if (minSizeRatio > 0)
+    if (useResize)
     {
         cv::resize(procImage, procImage, initSize, 0, 0, cv::INTER_NEAREST);
         if (verbose) ImageCommon::displayMat(procImage, true, "Normal size");
@@ -644,8 +726,6 @@ void detectObjects(const cv::Mat &image, Contours *objectContours,
 #endif
 
     if (verbose) ImageCommon::displayMat(procImage, true, "Morpho");
-
-
 
 
     // RETURN TO REMOVE
@@ -760,6 +840,45 @@ cv::Mat getObjectMask(const cv::Size &size, const std::vector<cv::Point> & conto
     cv::drawContours( objectMask, contours, 0, color, CV_FILLED);
     return objectMask;
 }
+
+//******************************************************************************************
+
+void detectObjects2(const cv::Mat &image, Contours *objectContours, double minSizeRatio, double maxSizeRatio, const cv::Mat &mask, DetectedObjectType type, double param, bool verbose)
+{
+
+    if (image.type() != CV_8U) {
+        SD_TRACE("detectObjects : Input image should a 8 bits single channel matrix");
+        return;
+    }
+
+    if (!objectContours)
+    {
+        SD_TRACE("detectObjects : ObjectContours is null");
+        return;
+    }
+
+    cv::Size size = image.size();
+    cv::Mat procImage;
+    image.copyTo(procImage);
+
+    int imageDim = (image.cols + image.rows)/2;
+    if (verbose) SD_TRACE1("Detected object min size : %1", imageDim*minSizeRatio);
+    if (verbose) SD_TRACE1("Detected object max size : %1", imageDim*maxSizeRatio);
+
+
+
+
+    int sx = 0.15*procImage.cols;
+    int sy = 0.15*procImage.rows;
+    cv::Mat freqMask = ImageProcessing::getCutGaussianKernel2D(sx, sy, 0.0, 0.0, 0.3);
+    ImageCommon::displayMat(freqMask, true, "freqMask");
+    ImageProcessing::freqFilter(procImage, procImage, freqMask, true, true);
+    ImageCommon::displayMat(procImage, true, "fft filteres");
+
+
+
+}
+
 
 //******************************************************************************************
 

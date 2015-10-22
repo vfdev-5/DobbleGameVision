@@ -18,11 +18,19 @@ namespace ImageProcessing
 
 cv::Mat DGV_DLL_EXPORT fftShift(const cv::Mat & input);
 
-void DGV_DLL_EXPORT freqFilter(const cv::Mat & input, cv::Mat & output, const cv::Mat & freqMask=cv::Mat::ones(10, 10, CV_32F), bool inside=true);
+void DGV_DLL_EXPORT freqFilter(const cv::Mat & input, cv::Mat & output, const cv::Mat & freqMask=cv::Mat::ones(10, 10, CV_32F), bool inside=true, bool verbose=false);
 
 void DGV_DLL_EXPORT enhance(const cv::Mat & input, cv::Mat & output, double strength = 0.25, bool laplacianOnly=true);
 
-cv::Mat DGV_DLL_EXPORT getGaussianKernel2D(const cv::Size & size, double sigmaX, double sigmaY);
+cv::Mat DGV_DLL_EXPORT getGaussianKernel2D(const cv::Size & size, double sigmaX=0.0, double sigmaY=0.0);
+
+inline cv::Mat DGV_DLL_EXPORT getGaussianKernel2D(int width, int height, double sigmaX=0.0, double sigmaY=0.0)
+{ return getGaussianKernel2D(cv::Size(width, height), sigmaX, sigmaY); }
+
+cv::Mat DGV_DLL_EXPORT getCutGaussianKernel2D(const cv::Size & size, double sigmaX=0.0, double sigmaY=0.0, double cut=0.5);
+
+inline cv::Mat DGV_DLL_EXPORT getCutGaussianKernel2D(int width, int height, double sigmaX=0.0, double sigmaY=0.0, double cut=0.5)
+{ return getCutGaussianKernel2D(cv::Size(width, height), sigmaX, sigmaY, cut); }
 
 cv::Mat DGV_DLL_EXPORT getCircleKernel2D(const cv::Size & size, double value=255.0, int type=CV_32F);
 
@@ -59,6 +67,12 @@ void DGV_DLL_EXPORT detectObjects(const cv::Mat & image,
                                   const cv::Mat & mask=cv::Mat(), DetectedObjectType type=ANY, double param=0.0,
                                   bool verbose=false);
 
+
+void DGV_DLL_EXPORT detectObjects2(const cv::Mat & image,
+                                  Contours * objectContours,
+                                  double minSizeRatio=0.0, double maxSizeRatio=1.0,
+                                  const cv::Mat & mask=cv::Mat(), DetectedObjectType type=ANY, double param=0.0,
+                                  bool verbose=false);
 
 
 //******************************************************************************************

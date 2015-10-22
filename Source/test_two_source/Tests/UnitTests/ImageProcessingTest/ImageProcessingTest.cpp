@@ -106,7 +106,7 @@ void ImageProcessingTest::detectObjectsTest1()
     // Detect all objects :
     ImageProcessing::Contours objects;
 
-    double minSizeRatio(0.0);
+    double minSizeRatio(0.05);
     double maxSizeRatio(0.95);
     ImageProcessing::DetectedObjectType type = ImageProcessing::ANY;
     cv::Mat mask = cv::Mat();
@@ -171,7 +171,7 @@ void ImageProcessingTest::detectObjectsTest2()
     // Detect all objects :
     ImageProcessing::Contours objects;
 
-    double minSizeRatio(0.0);
+    double minSizeRatio(0.05);
     double maxSizeRatio(0.95);
     ImageProcessing::DetectedObjectType type = ImageProcessing::ANY;
     cv::Mat mask = cv::Mat();
@@ -200,7 +200,7 @@ void ImageProcessingTest::detectObjectsTest2()
                                    false);
 
 //    SD_TRACE1("Object count = %1", objects.size());
-    QVERIFY(4 == objects.size());
+    QVERIFY(3 == objects.size());
 
 }
 
@@ -212,7 +212,7 @@ void ImageProcessingTest::detectObjectsTest3()
     cv::Mat in = generateBigObjects();
     addNoise(in);
 
-    ImageCommon::displayMat(in, true);
+//    ImageCommon::displayMat(in, true);
 
 
     // Detect all objects :
@@ -227,8 +227,8 @@ void ImageProcessingTest::detectObjectsTest3()
                                    mask, type, 0.7,
                                    true);
 
-    //    SD_TRACE1("Object count = %1", objects.size());
-//    QVERIFY(2 == objects.size());
+//    SD_TRACE1("Object count = %1", objects.size());
+    QVERIFY(2 == objects.size());
 
 
 

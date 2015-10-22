@@ -90,7 +90,6 @@ cv::Mat generateBigObjects()
         x=i*2.5 + i/2 + i/20;
         y=qrand() & 500;
         cv::circle(out, cv::Point(x, y), 5 + qrand()&15, cv::Scalar::all(150), CV_FILLED);
-
         cv::line(out, cv::Point(y,x), cv::Point(y, x+10), cv::Scalar::all(250), 3);
     }
 
