@@ -499,7 +499,7 @@ void printMat(const cv::Mat & inputImage0, const QString &windowName, int limit)
     SD_TRACE(QString("------ Print matrix : ") + t);
     int w = inputImage.cols;
     int h = inputImage.rows;
-    SD_TRACE("Size : " + QString::number(w) + ", " + QString::number(h));
+    SD_TRACE3("Size : %1 x %2 | Depth (bytes) : %3", w, h, inputImage0.elemSize1());
 
     w = w > limit ? limit : w;
     h = h > limit ? limit : h;

@@ -6,7 +6,9 @@ link_directories(${OpenCV_LIB_DIR})
 link_libraries(${OpenCV_LIBS})
 
 ## include & link to Qt :
-SET(INSTALL_QT_DLLS OFF)
+if(WIN32)
+    SET(INSTALL_QT_DLLS OFF)
+endif(WIN32)
 include(Qt)
 
 
@@ -46,9 +48,6 @@ endforeach()
 ## Use .qrc files:
 file(GLOB QRC_FILES "Resources/*.qrc")
 QT5_ADD_RESOURCES (ResourceSources ${QRC_FILES})
-
-# add ui_<source>.h
-INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR}/Lib)
 
 #### for debug purposes: ################
 if (NOT WIN32)

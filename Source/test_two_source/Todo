@@ -1,30 +1,3 @@
+﻿1) Test Bag-of-Words algorithm using ORB features
+	- Prepare training image base
 
-
-Algorithm
-
-Problems :
-    1)
-
-
-12/08/2015
-
-1) Size of the input image influences :
-	a) Number of detected descriptors
-	b) minimal distance for good matches
-	c) minimal number of good matches 
-
-
-
-2) Provide 3 modes :
-
-	a) Fast but the less precise 
-		- extract features : 1) Hu moments, 2) 
-		- match features :
-	
-	b) Basic, more accurate
-		- extract features : AKAZE features
-		- match features : FLANN matcher
-
-	c) Complex with ML
-		-- Training phase : 
-		-- Detection phase :  

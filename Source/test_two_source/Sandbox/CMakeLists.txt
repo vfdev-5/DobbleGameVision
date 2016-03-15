@@ -7,4 +7,5 @@ add_subdirectory("NonlinearDiffusionFiltering_Example")
 endif()
 
 add_subdirectory("FreqFiltering_Example")
+add_subdirectory("BoW_Classification_Example")
 
